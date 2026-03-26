@@ -1,0 +1,15 @@
+# @package _global_
+
+eval_dataset_name: "deepwind_test"
+
+data_val:
+  # Path configuration (Use absolute paths or env vars in production)
+  npy_path: "/scratch/pawsey0115/hwang4/deepwindData/test/csg_wind_5.npy"
+  metadata_path: "/scratch/pawsey0115/hwang4/deepwindData/train_metadata.csv"
+  context_length: ${model.context_length}
+  prediction_length: 0
+  stride: ${model.input_patch_size}
+  split: 'val'
+  max_vars: 6
+  pad_val_id: 10
+  

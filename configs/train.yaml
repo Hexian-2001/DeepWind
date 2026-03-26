@@ -1,0 +1,31 @@
+# configs/train.yaml
+
+# 1. Default Composition
+# Load these files by default if not overridden via command line
+defaults:
+  - _self_
+  - model: deepwind # Refers to configs/model/deepwind.yaml
+  - data: wind_full # Refers to configs/data/wind_full.yaml
+  - data_val: wind_val
+  - training: default # Refers to configs/training/default.yaml
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+# 2. Global Variables
+# Used for reproducibility
+seed: 42
+project_name: "DeepWind-Research"
+run_name: "deepwind-baseline" # Will be used for WandB/Tensorboard
+  
+# 3. Hydra System Config
+# Controls where logs and overrides are saved
+hydra:
+  run:
+    dir: /scratch/pawsey0115/hwang4/deepwind_experiments/logs/${run_name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
+
+  sweep:
+    dir: /scratch/pawsey0115/hwang4/deepwind_experiments/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+
+  job:
+    chdir: true

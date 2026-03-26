@@ -1,0 +1,31 @@
+# Data & models
+data/
+*.pt
+*.ckpt
+*.pth
+*.h5
+*.parquet
+*.csv
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Logs & outputs
+logs/
+outputs/
+results/
+wandb/
+runs/
+
+# Env
+.env
+*.env

@@ -1,0 +1,59 @@
+# @package _global_
+
+training:
+  # --- Checkpointing & Logging ---
+  output_dir: "${oc.env:SCRATCH_ROOT}/checkpoints/${run_name}"
+  overwrite_output_dir: false
+  run_name: ${run_name} # Reference global variable
+  report_to: "none"
+
+  # --- Optimization ---
+  learning_rate: 3e-4
+  weight_decay: 0.01
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  max_grad_norm: 1.0
+
+  # --- Batch Size & Steps ---
+  per_device_train_batch_size: 16
+  gradient_accumulation_steps: 2
+  ignore_data_skip: true
+  
+  max_steps: 50000 # Training duration (Step-based)
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.03
+
+  # --- Hardware & Precision ---
+  # Standard for A100/H100/RTX3090+
+  bf16: true
+
+  # DataLoader workers (Controlled by Trainer)
+
+  dataloader_num_workers: 8
+  dataloader_pin_memory: true
+  
+  # --- Saving Strategy ---
+  save_strategy: "steps"
+  save_steps: 5000
+  save_total_limit: 5
+
+  # --- Logging Strategy ---
+  logging_strategy: "steps"
+  logging_steps: 500
+  logging_first_step: true
+  disable_tqdm: true
+
+  # --- DDP Settings (Crucial for MoE) ---
+  # If your model graph is static, set False for speed.
+  # If MoE routing causes unused params in some steps, set True.
+  ddp_find_unused_parameters: true
+  
+  eval_strategy: "steps"
+  eval_steps: 5000
+  per_device_eval_batch_size: 16
+  load_best_model_at_end: true
+  metric_for_best_model: "loss"
+  greater_is_better: false
+  prediction_loss_only: true
+  log_on_each_node: false
+

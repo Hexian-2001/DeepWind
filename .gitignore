@@ -29,3 +29,5 @@ runs/
 # Env
 .env
 *.env
+
+# Exception: src/data is code, not data files

@@ -1,5 +1,5 @@
-# Data & models
-data/
+# Data & models (only root-level data folder)
+/data/
 *.pt
 *.ckpt
 *.pth
@@ -29,5 +29,3 @@ runs/
 # Env
 .env
 *.env
-
-# Exception: src/data is code, not data files

@@ -1,0 +1,28 @@
+# configs/data/train.yaml
+# Training data config — matches DeepWindTrainDataset constructor.
+
+# ---- Paths ----
+npy_root: "/scratch/pawsey0115/hwang4/deepwindData/train"
+metadata_path: "/scratch/pawsey0115/hwang4/deepwindData/train_metadata.csv"
+
+# ---- Sequence ----
+seq_len: ${model.context_length}
+max_vars: 6
+pad_val_id: 10
+
+# ---- Dataset-level balanced sampling ----
+dataset_weights:
+  windtoolkit: 0.7
+  scada: 0.3
+
+# ---- Adaptive windowing ----
+sample_ratio: 0.005
+min_windows_per_file: 4
+max_windows_per_file: 128
+
+# ---- IO strategy ----
+full_read_coverage_threshold: 0.3
+
+# ---- Iteration ----
+repeat: true
+seed: ${seed}

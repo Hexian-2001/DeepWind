@@ -1,58 +1,46 @@
-# @package _global_
+# configs/model/deepwind_debug.yaml
+# Minimal config for fast logic verification and single-GPU testing.
 
-model_name: "deepwind"
+# --- Transformer Dimensions (Reduced) ---
+d_model: 64
+num_layers: 2
+num_heads: 4
+d_ff: 128
+dropout: 0.0      # Disabled for deterministic loss behavior during debug
 
-model:
-  d_model: 64         
-  num_layers: 2       
-  num_heads: 4        
-  d_ff: 256           
-  dropout: 0.0        
-  
-  
-  input_patch_size: 8
-  input_patch_stride: 8
-  context_length: 128  
+# --- Patching & Sequence ---
+input_patch_size: 16
+input_patch_stride: 16
+context_length: 512  # Small context to fit in minimal GPU memory
 
-  quantiles: 
-    - 0.01 
-    - 0.05 
-    - 0.1 
-    - 0.15
-    - 0.2
-    - 0.25
-    - 0.3
-    - 0.35
-    - 0.4
-    - 0.45
-    - 0.5
-    - 0.55
-    - 0.6
-    - 0.65
-    - 0.7
-    - 0.75
-    - 0.8
-    - 0.85
-    - 0.9
-    - 0.95
-    - 0.99
+# --- Probabilistic Output ---
+quantiles:
+  - 0.1
+  - 0.5
+  - 0.9           # Reduced quantile head size
 
-  use_variate_atten: true
-  use_variate_embed: true
-  use_coord_embed: true
-  use_load_balance_loss: true
-  use_rotary_emb: false
-  use_rms_norm: true
-  
-  variate_atten_every_n_layers: 2 
-  variate_atten_first: false
+# --- Feature Switches (Must align with production) ---
+use_variate_atten: true
+use_variate_embed: true
+use_coord_embed: true
+use_load_balance_loss: true
+aux_loss_weight: 0.02
+use_rotary_emb: true
+use_xpos: true
+use_rms_norm: true
+use_patch_stats: false
 
-  use_moe: true
-  num_experts: 4            
-  num_experts_per_token: 2  
-  
-  # --- Misc ---
-  num_known_variates: 10
-  num_patch_stats: 9
-  dense_act_fn: "silu"
-  use_arcsinh: true
+# --- Attention Logic ---
+variate_atten_every_n_layers: 2
+variate_atten_first: false
+
+# --- MoE Configuration ---
+use_moe: true
+num_experts: 2             # Minimal viable MoE to test routing logic
+num_experts_per_token: 1   # Simplified routing
+
+# --- Misc ---
+num_known_variates: 10
+num_patch_stats: 9
+dense_act_fn: "silu"
+use_arcsinh: true

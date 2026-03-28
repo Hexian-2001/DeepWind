@@ -1,122 +1,205 @@
+from __future__ import annotations
+
 import logging
 import os
-import sys
-import hydra
-from pathlib import Path
-from omegaconf import DictConfig, OmegaConf
-from typing import Optional
 
-import torch
+import hydra
 import torch.distributed as dist
 import transformers
+import wandb
+from omegaconf import DictConfig, OmegaConf
 from transformers import (
-    Trainer, 
-    TrainingArguments, 
+    TrainingArguments,
+    default_data_collator,
     set_seed,
-    default_data_collator
 )
 from transformers.trainer_utils import get_last_checkpoint
 
-from src.utils.registry import MODEL_REGISTRY, CONFIG_REGISTRY, DATASET_REGISTRY
-from src.utils.trainer import DeepWindTrainer
+from src.data.datasets import *  # noqa: F401, F403 — trigger dataset registration
+from src.models.configuration import *  # noqa: F401, F403 — trigger config registration
+from src.models.deepwind import *  # noqa: F401, F403 — trigger model registration
 from src.utils.distributed import is_main_process
+from src.utils.registry import CONFIG_REGISTRY, DATASET_REGISTRY, MODEL_REGISTRY
+from src.utils.trainer import DeepWindTrainer
 
-import src.models.deepwind
-import src.models.configuration
-import src.data.datasets 
-
-
-# Setup Logger
 logger = logging.getLogger(__name__)
 
-@hydra.main(version_base=None, config_path="configs", config_name="train")
-def main(cfg: DictConfig):
-    # =========================================================================
-    # 1. Environment & Logging Setup
-    # =========================================================================
-    # Resolve the config to static container
-    # (Hydra uses LazyConfig by default, we resolve it to verify interpolation)
-    OmegaConf.resolve(cfg)
-    
-    log_level = logging.INFO 
-    if cfg.get("training") and cfg.training.get("log_level"):
-        log_level = transformers.utils.logging.log_levels.get(cfg.training.log_level, logging.INFO)
 
-    transformers.utils.logging.disable_default_handler()  
+# ---------------------------------------------------------------------------
+# Setup helpers
+# ---------------------------------------------------------------------------
+
+
+def _setup_logging(cfg: DictConfig) -> None:
+    """Configure transformers logging for rank-0 only, suppressing duplicates."""
+    raw_level: str = (
+        cfg.get("training", {}).get("log_level", "info") or "info"
+    )
+    log_level: int = logging.getLevelName(raw_level.upper())
+    if not isinstance(log_level, int):
+        log_level = logging.INFO
+
+    transformers.utils.logging.disable_default_handler()
     transformers.utils.logging.set_verbosity(log_level)
     transformers.logging.get_logger("transformers").propagate = False
-    
-    # Set Seed for Reproducibility
-    set_seed(cfg.seed)
 
-    # =========================================================================
-    # 2. Checkpoint Auto-Resume Logic (The Solution)
-    # =========================================================================
-    output_dir = cfg.training.output_dir
-    training_args_dict = OmegaConf.to_container(cfg.training, resolve=True)
-    training_args = TrainingArguments(**training_args_dict)
 
-    # Detect last checkpoint
-    last_checkpoint = None
-    if os.path.isdir(output_dir) and not training_args.overwrite_output_dir:
-        last_checkpoint = get_last_checkpoint(output_dir)
-        if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
-            if is_main_process():
-                logger.info(
-                    f"Checkpoint detected, resuming training at {last_checkpoint}. "
-                    "To avoid this behavior, change the 'run_name' or set 'overwrite_output_dir' to True"
-                )
+def _setup_wandb(cfg: DictConfig) -> None:
+    """Initialise a wandb run on rank 0.
 
-    # =========================================================================
-    # 3. Model & Config Initialization (via Registry)
-    # =========================================================================
-    if is_main_process():
-        logger.info(f"Initializing Model: {cfg.model_name}")
-    
-    # Retrieve Classes
+    Passes the full resolved config as hyperparameters so every run is
+    self-documenting.  ``resume="allow"`` pairs with auto-checkpoint
+    detection: if a run with the same ``id`` already exists on the wandb
+    server the metrics will be appended rather than duplicated.
+
+    This function is a no-op on non-main processes because
+    ``WANDB_MODE=disabled`` is set for them in ``main()``.
+    """
+    wandb_cfg = cfg.get("wandb", {})
+    wandb.init(
+        project=wandb_cfg.get("project", cfg.project_name),
+        name=wandb_cfg.get("name", cfg.run_name),
+        tags=list(wandb_cfg.get("tags") or []),
+        notes=wandb_cfg.get("notes") or "",
+        config=OmegaConf.to_container(cfg, resolve=True),
+        resume="allow",
+    )
+    logger.info("wandb run: %s", wandb.run.url)
+
+
+# ---------------------------------------------------------------------------
+# Checkpoint detection
+# ---------------------------------------------------------------------------
+
+
+def _detect_checkpoint(
+    output_dir: str,
+    training_args: TrainingArguments,
+) -> str | None:
+    """Return the path to the last checkpoint, or ``None``.
+
+    A checkpoint is only reported when:
+    * ``output_dir`` exists and contains a valid checkpoint, AND
+    * ``overwrite_output_dir`` is ``False``, AND
+    * ``resume_from_checkpoint`` was not explicitly set by the user
+      (in which case the user-supplied value takes precedence).
+    """
+    if not os.path.isdir(output_dir):
+        return None
+    if training_args.overwrite_output_dir:
+        return None
+
+    last_ckpt = get_last_checkpoint(output_dir)
+    if last_ckpt and training_args.resume_from_checkpoint is None:
+        logger.info(
+            "Checkpoint detected: %s. "
+            "Resuming training. Set overwrite_output_dir=true to start fresh.",
+            last_ckpt,
+        )
+    return last_ckpt
+
+
+# ---------------------------------------------------------------------------
+# Model / dataset factories
+# ---------------------------------------------------------------------------
+
+
+def _build_model(cfg: DictConfig):
+    """Instantiate model from registry using the Hydra model config."""
     ConfigClass = CONFIG_REGISTRY.get(cfg.model_name)
     ModelClass = MODEL_REGISTRY.get(cfg.model_name)
-    
-    # Convert Hydra config to Dict
+
     model_config_dict = OmegaConf.to_container(cfg.model, resolve=True)
     config = ConfigClass(**model_config_dict)
-
-    # Instantiate Model
-    # Note: If resuming, Trainer will load weights from checkpoint later.
-    # Here we just initialize the architecture.
     model = ModelClass(config)
 
-    # Log Parameter Count
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    if is_main_process():
-        logger.info(f"Model Parameters: {trainable_params / 1e6:.2f} M")
+    n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    logger.info("Model: %s | Trainable parameters: %.2fM", cfg.model_name, n_params / 1e6)
 
-    # =========================================================================
-    # 4. Dataset Initialization (via Registry)
-    # =========================================================================
-    if is_main_process():
-        logger.info(f"Initializing Train Dataset: {cfg.train_dataset_name}")
-    TrainDatasetClass = DATASET_REGISTRY.get(cfg.train_dataset_name)
-    train_data_args = OmegaConf.to_container(cfg.data, resolve=True)
-    train_dataset = TrainDatasetClass(**train_data_args)
-    
-    eval_dataset = None
-    
-    if "data_val" in cfg:
-        eval_cls_name = cfg.eval_dataset_name
-        if is_main_process():
-            logger.info(f"Initializing Valid Dataset: {eval_cls_name}")
-        EvalDatasetClass = DATASET_REGISTRY.get(eval_cls_name)
-        
-        if EvalDatasetClass is None:
-             raise ValueError(f"Dataset '{eval_cls_name}' not found in registry!")
-        
-        eval_data_args = OmegaConf.to_container(cfg.data_val, resolve=True)
-        eval_dataset = EvalDatasetClass(**eval_data_args)
-    else:
-        if is_main_process():
-            logger.warning("No validation config found. Skipping evaluation.")
+    return model
 
+
+def _build_train_dataset(cfg: DictConfig):
+    """Instantiate the training dataset from the registry."""
+    DatasetClass = DATASET_REGISTRY.get(cfg.train_dataset_name)
+    data_args = OmegaConf.to_container(cfg.data, resolve=True)
+    logger.info("Train dataset: %s", cfg.train_dataset_name)
+    return DatasetClass(**data_args)
+
+
+def _build_eval_dataset(cfg: DictConfig):
+    """Instantiate eval dataset(s) from the registry.
+
+    Returns a ``Dict[str, Dataset]`` when ``eval_groups`` is configured so
+    that HF Trainer emits per-group metrics (e.g. ``eval_windtoolkit/loss``,
+    ``eval_scada/loss``).  Returns a single ``Dataset`` for a combined eval,
+    or ``None`` when no eval config is present.
+    """
+    if "data_eval" not in cfg:
+        logger.warning("No data_eval config found — skipping evaluation.")
+        return None
+
+    EvalDatasetClass = DATASET_REGISTRY.get(cfg.eval_dataset_name)
+    if EvalDatasetClass is None:
+        raise ValueError(
+            f"Eval dataset '{cfg.eval_dataset_name}' not found in DATASET_REGISTRY."
+        )
+
+    eval_args: dict = OmegaConf.to_container(cfg.data_eval, resolve=True)
+    eval_groups: list[str] | None = eval_args.pop("eval_groups", None)
+
+    if eval_groups:
+        eval_dataset = {}
+        for group in eval_groups:
+            eval_dataset[group] = EvalDatasetClass(**eval_args, filter_dataset=group)
+            logger.info(
+                "Eval dataset [%s]: %d samples", group, len(eval_dataset[group])
+            )
+        return eval_dataset
+
+    ds = EvalDatasetClass(**eval_args)
+    logger.info("Eval dataset: %d samples", len(ds))
+    return ds
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+
+@hydra.main(version_base=None, config_path="configs", config_name="train")
+def main(cfg: DictConfig) -> None:
+    OmegaConf.resolve(cfg)
+
+    # ── Silence all wandb output on non-main processes before any import
+    #    side-effects can create a spurious run. ──────────────────────────────
+    if not is_main_process():
+        os.environ["WANDB_MODE"] = "disabled"
+
+    # 1. Logging & reproducibility
+    _setup_logging(cfg)
+    set_seed(cfg.seed)
+
+    if is_main_process():
+        logger.info("Run: %s", cfg.run_name)
+        logger.info("Config:\n%s", OmegaConf.to_yaml(cfg, resolve=True))
+
+    # 2. Training arguments & checkpoint detection
+    training_args = TrainingArguments(
+        **OmegaConf.to_container(cfg.training, resolve=True)
+    )
+    last_checkpoint = _detect_checkpoint(training_args.output_dir, training_args)
+
+    # 3. wandb (rank-0 only; other ranks are already disabled via env var)
+    if is_main_process() and training_args.report_to and "wandb" in training_args.report_to:
+        _setup_wandb(cfg)
+
+    # 4. Model & datasets
+    model = _build_model(cfg)
+    train_dataset = _build_train_dataset(cfg)
+    eval_dataset = _build_eval_dataset(cfg)
+
+    # 5. Trainer
     trainer = DeepWindTrainer(
         model=model,
         args=training_args,
@@ -125,40 +208,27 @@ def main(cfg: DictConfig):
         data_collator=default_data_collator,
     )
 
-    # =========================================================================
-    # 6. Start Training
-    # =========================================================================
-    checkpoint = None
-    if training_args.resume_from_checkpoint is not None:
-        checkpoint = training_args.resume_from_checkpoint
-    elif last_checkpoint is not None:
-        checkpoint = last_checkpoint
-
-    if is_main_process():
-        logger.info("Starting Training...")
-
-    if dist.is_initialized():
-        if is_main_process():
-            print(f"Rank {dist.get_rank()} is waiting at the barrier before loading checkpoint...")
+    # 6. Synchronise all ranks before training begins
+    if dist.is_available() and dist.is_initialized():
         dist.barrier()
 
+    if is_main_process():
+        logger.info("Starting training...")
+
+    checkpoint = training_args.resume_from_checkpoint or last_checkpoint
     train_result = trainer.train(resume_from_checkpoint=checkpoint)
 
-    # =========================================================================
-    # 7. Final Saving & Metrics
-    # =========================================================================
-    if is_main_process():
-        logger.info(f"Saving model to {training_args.output_dir}")
-
-    trainer.save_model()  # Saves the model/tokenizer
-    
-    metrics = train_result.metrics
-    trainer.log_metrics("train", metrics)
-    trainer.save_metrics("train", metrics)
+    # 7. Persist artefacts
+    trainer.save_model()
+    trainer.log_metrics("train", train_result.metrics)
+    trainer.save_metrics("train", train_result.metrics)
     trainer.save_state()
 
     if is_main_process():
-        logger.info("Training Completed Successfully.")
+        logger.info("Training completed.")
+        if wandb.run is not None:
+            wandb.finish()
+
 
 if __name__ == "__main__":
     main()

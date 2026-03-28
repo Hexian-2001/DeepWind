@@ -1,31 +1,37 @@
 # configs/train.yaml
+# Master config — composes model, data, eval, and training configs.
 
-# 1. Default Composition
-# Load these files by default if not overridden via command line
 defaults:
   - _self_
-  - model: deepwind # Refers to configs/model/deepwind.yaml
-  - data: wind_full # Refers to configs/data/wind_full.yaml
-  - data_val: wind_val
-  - training: default # Refers to configs/training/default.yaml
+  - model: deepwind_small
+  - data: train
+  - data_eval: eval
+  - training: deepwind_small
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
 
-# 2. Global Variables
-# Used for reproducibility
+# Global variables
 seed: 42
 project_name: "DeepWind-Research"
-run_name: "deepwind-baseline" # Will be used for WandB/Tensorboard
-  
-# 3. Hydra System Config
-# Controls where logs and overrides are saved
+run_name: "deepwind"
+
+model_name: "deepwind"
+train_dataset_name: "deepwind_train"
+eval_dataset_name: "deepwind_eval"
+
+results_root: "${oc.env:SCRATCH_ROOT}/results"
+
+wandb:
+  project: ${project_name}
+  name: ${run_name}
+  tags: []
+  notes: ""
+
 hydra:
   run:
-    dir: /scratch/pawsey0115/hwang4/deepwind_experiments/logs/${run_name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
-
+    dir: ${results_root}/${project_name}/experiments/${run_name}/logs/${now:%Y-%m-%d_%H-%M-%S}
   sweep:
-    dir: /scratch/pawsey0115/hwang4/deepwind_experiments/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ${results_root}/${project_name}/experiments/${run_name}/sweeps/${now:%Y-%m-%d_%H-%M-%S}
     subdir: ${hydra.job.num}
-
   job:
     chdir: true

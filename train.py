@@ -15,9 +15,9 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint
 
-from src.data.datasets import *  # noqa: F401, F403 — trigger dataset registration
-from src.models.configuration import *  # noqa: F401, F403 — trigger config registration
-from src.models.deepwind import *  # noqa: F401, F403 — trigger model registration
+from src.data.datasets import *  
+from src.models.configuration import *  
+from src.models.deepwind import *  
 from src.utils.distributed import is_main_process
 from src.utils.registry import CONFIG_REGISTRY, DATASET_REGISTRY, MODEL_REGISTRY
 from src.utils.trainer import DeepWindTrainer
@@ -38,7 +38,7 @@ def _setup_logging(cfg: DictConfig) -> None:
     log_level: int = logging.getLevelName(raw_level.upper())
     if not isinstance(log_level, int):
         log_level = logging.INFO
-
+    
     transformers.utils.logging.disable_default_handler()
     transformers.utils.logging.set_verbosity(log_level)
     transformers.logging.get_logger("transformers").propagate = False
@@ -91,11 +91,12 @@ def _detect_checkpoint(
 
     last_ckpt = get_last_checkpoint(output_dir)
     if last_ckpt and training_args.resume_from_checkpoint is None:
-        logger.info(
+        if is_main_process():
+            logger.info(
             "Checkpoint detected: %s. "
             "Resuming training. Set overwrite_output_dir=true to start fresh.",
             last_ckpt,
-        )
+            )
     return last_ckpt
 
 
@@ -114,7 +115,8 @@ def _build_model(cfg: DictConfig):
     model = ModelClass(config)
 
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    logger.info("Model: %s | Trainable parameters: %.2fM", cfg.model_name, n_params / 1e6)
+    if is_main_process():
+        logger.info("Model: %s | Trainable parameters: %.2fM", cfg.model_name, n_params / 1e6)
 
     return model
 
@@ -123,7 +125,8 @@ def _build_train_dataset(cfg: DictConfig):
     """Instantiate the training dataset from the registry."""
     DatasetClass = DATASET_REGISTRY.get(cfg.train_dataset_name)
     data_args = OmegaConf.to_container(cfg.data, resolve=True)
-    logger.info("Train dataset: %s", cfg.train_dataset_name)
+    if is_main_process():
+        logger.info("Train dataset: %s", cfg.train_dataset_name)
     return DatasetClass(**data_args)
 
 
@@ -152,13 +155,13 @@ def _build_eval_dataset(cfg: DictConfig):
         eval_dataset = {}
         for group in eval_groups:
             eval_dataset[group] = EvalDatasetClass(**eval_args, filter_dataset=group)
-            logger.info(
-                "Eval dataset [%s]: %d samples", group, len(eval_dataset[group])
-            )
+            if is_main_process():
+                logger.info("Eval dataset [%s]: %d samples", group, len(eval_dataset[group]))
         return eval_dataset
 
     ds = EvalDatasetClass(**eval_args)
-    logger.info("Eval dataset: %d samples", len(ds))
+    if is_main_process():
+        logger.info("Eval dataset: %d samples", len(ds))
     return ds
 
 
@@ -175,7 +178,7 @@ def main(cfg: DictConfig) -> None:
     #    side-effects can create a spurious run. ──────────────────────────────
     if not is_main_process():
         os.environ["WANDB_MODE"] = "disabled"
-
+    
     # 1. Logging & reproducibility
     _setup_logging(cfg)
     set_seed(cfg.seed)

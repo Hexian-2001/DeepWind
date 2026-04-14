@@ -18,7 +18,7 @@ max_grad_norm: 1.0
 # --- Batch Size & Steps ---
 per_device_train_batch_size: 32
 gradient_accumulation_steps: 2
-max_steps: 170000
+max_steps: 100000
 lr_scheduler_type: "cosine"
 warmup_ratio: 0.03
 
@@ -29,7 +29,7 @@ ignore_data_skip: true
 bf16: true
 
 # --- DataLoader ---
-dataloader_num_workers: 8
+dataloader_num_workers: 4
 dataloader_pin_memory: true
 
 # --- Checkpoint ---

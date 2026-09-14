@@ -60,6 +60,7 @@ def _setup_wandb(cfg: DictConfig) -> None:
     wandb.init(
         project=wandb_cfg.get("project", cfg.project_name),
         name=wandb_cfg.get("name", cfg.run_name),
+        id=wandb_cfg.get("id", cfg.run_name),
         tags=list(wandb_cfg.get("tags") or []),
         notes=wandb_cfg.get("notes") or "",
         config=OmegaConf.to_container(cfg, resolve=True),

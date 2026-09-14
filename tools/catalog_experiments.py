@@ -8,7 +8,6 @@ import json
 import re
 from pathlib import Path
 
-
 CHECKPOINT_RE = re.compile(r"checkpoint-(\d+)$")
 
 

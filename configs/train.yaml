@@ -24,6 +24,7 @@ results_root: "${oc.env:DEEPWIND_RUNS_ROOT}"
 wandb:
   project: ${project_name}
   name:    ${run_name}
+  id:      ${run_name}
   tags:    []
   notes:   ""
   dir:     "${results_root}/${project_name}/wandb_cache"   

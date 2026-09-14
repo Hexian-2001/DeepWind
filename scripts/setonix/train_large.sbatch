@@ -7,6 +7,8 @@
 #SBATCH --exclusive
 #SBATCH --time=24:00:00
 #SBATCH --account=pawsey0115-gpu
+#SBATCH --requeue
+#SBATCH --signal=B:USR1@300
 
 set -euo pipefail
 
@@ -22,6 +24,13 @@ run_name="${DEEPWIND_RUN_NAME:-large-${SLURM_JOB_ID}}"
 run_dir="${DEEPWIND_RUNS_ROOT}/${run_name}"
 mkdir -p "${run_dir}"/{checkpoints,logs,metadata,wandb}
 exec > >(tee -a "${run_dir}/logs/train.log") 2>&1
+
+requeue_on_timeout() {
+  printf 'Received pre-timeout signal; requeueing job %s.\n' "${SLURM_JOB_ID}"
+  scontrol requeue "${SLURM_JOB_ID}"
+  exit 0
+}
+trap requeue_on_timeout USR1
 
 git -C "${DEEPWIND_PROJECT_ROOT}" rev-parse HEAD > "${run_dir}/metadata/git_commit.txt"
 git -C "${DEEPWIND_PROJECT_ROOT}" status --porcelain > "${run_dir}/metadata/git_status.txt"

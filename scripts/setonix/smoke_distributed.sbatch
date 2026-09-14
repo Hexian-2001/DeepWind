@@ -3,6 +3,7 @@
 #SBATCH --partition=gpu-dev
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=16
 #SBATCH --gpus-per-node=2
 #SBATCH --time=00:30:00
 #SBATCH --account=pawsey0115-gpu
@@ -51,7 +52,8 @@ command="${DEEPWIND_VENV}/bin/python -m torch.distributed.run \
   data.metadata_path=${DEEPWIND_DATA_ROOT}/train_metadata.csv"
 printf '%s\n' "${command}" > "${run_dir}/metadata/command.txt"
 
-srun -N "${SLURM_JOB_NUM_NODES}" -n "${SLURM_JOB_NUM_NODES}" --cpu-bind=none \
+srun -N "${SLURM_JOB_NUM_NODES}" -n "${SLURM_JOB_NUM_NODES}" \
+  --ntasks-per-node=1 --cpus-per-task=16 --gpus-per-task="${gpus_per_node}" --cpu-bind=none \
   singularity exec --rocm \
   --bind "${DEEPWIND_PROJECT_ROOT},${DEEPWIND_DATA_ROOT},${DEEPWIND_RUNS_ROOT},${DEEPWIND_VENV}" \
   "${SINGULARITY_CONTAINER}" bash -lc "${command}"

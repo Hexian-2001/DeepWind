@@ -12,7 +12,8 @@ from jaxtyping import Float, Bool
 from src.models.configuration import DeepWindConfig
 from src.models.layers import DeepWindLayer, DeepWindLayerOutput
 from src.utils.constants import AttentionAxis
-from src.layers.rope import TimeAwareRotaryEmbedding 
+from src.utils.cache import KVCache
+from src.layers.rope import TimeAwareRotaryEmbedding
 from src.layers.ffn import FeedForwardOutput
 from src.utils.constants import prepare_variate_atten_mask, generate_attention_axes
 
@@ -99,7 +100,7 @@ class DeepWindBackbone(nn.Module):
         self,
         inputs: Float[torch.Tensor, "batch variate seq_len embed_dim"],
         id_mask: Optional[torch.Tensor] = None,
-        kv_cache: Optional[dict] = None,
+        kv_cache: Optional[KVCache] = None,
         output_hidden_states: bool = False,
         output_attentions: bool = False,
         output_router_logits: bool = False,

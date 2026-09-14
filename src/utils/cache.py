@@ -1,130 +1,56 @@
+from typing import List, Tuple
+
 import torch
-from typing import Optional, Tuple
 
 
 class KVCache:
     """
-    A unified Key-Value Cache manager for autoregressive generation.
+    Key-Value cache for autoregressive (expand-collapse) decoding.
 
-    This implementation uses pre-allocated tensors (Static Cache) to avoid 
-    dynamic memory allocation overhead during the generation loop.
-    It manages the KV cache for all layers in the model.
+    Stores, per layer, the Key/Value tensors produced at each decoding step so
+    past keys/values are reused instead of recomputed. This is a simple dynamic
+    cache: chunks are appended per step and concatenated along the sequence
+    dimension on read, avoiding any pre-allocation or max-length bookkeeping.
+
+    The interface mirrors what ``src.layers.attention.BaseMultiheadAttention``
+    expects:
+
+        - ``seq_len(layer_idx)``      -> number of tokens cached for that layer
+        - ``append(layer_idx, (k, v))`` -> store the current step's Key/Value
+        - ``cache[layer_idx]``        -> full (past + current) Key/Value
     """
 
-    def __init__(
-        self,
-        max_batch_size: int,
-        max_seq_len: int,
-        num_layers: int,
-        num_heads: int,
-        head_dim: int,
-        dtype: torch.dtype = torch.bfloat16,
-        device: torch.device = torch.device("cuda"),
-    ) -> None:
-        """
-        Parameters
-        ----------
-        max_batch_size : int
-            Maximum batch size expected during inference.
-        max_seq_len : int
-            Maximum sequence length (context window + generation length).
-        num_layers : int
-            Number of Transformer layers in the model.
-        num_heads : int
-            Number of attention heads per layer.
-        head_dim : int
-            Dimension of each attention head.
-        dtype : torch.dtype
-            Data type for the cache (usually float16 or bfloat16).
-        device : torch.device
-            Device to store the cache on.
-        """
-        self.max_batch_size = max_batch_size
-        self.max_seq_len = max_seq_len
-        self.num_layers = num_layers
-        self.num_heads = num_heads
-        self.head_dim = head_dim
-        self.dtype = dtype
-        self.device = device
+    def __init__(self, num_layers: int) -> None:
+        self._keys:   List[List[torch.Tensor]] = [[] for _ in range(num_layers)]
+        self._values: List[List[torch.Tensor]] = [[] for _ in range(num_layers)]
+        self._lengths: List[int] = [0] * num_layers
 
-        # Initialize the current sequence length counter.
-        # This points to the next empty slot in the sequence dimension.
-        self._current_seq_len = 0
+    def __len__(self) -> int:
+        return len(self._keys)
 
-        # Pre-allocate memory for all layers.
-        # Shape: (num_layers, 2, max_batch_size, num_heads, max_seq_len, head_dim)
-        # The '2' dimension corresponds to (Key, Value).
-        # We use a single monolithic tensor or a list of tensors. 
-        # A list of tensors is often preferred to allow layers to be on different devices 
-        # (pipeline parallelism), but here we assume single device for simplicity.
-        self.cache = [
-            torch.zeros(
-                (2, max_batch_size, num_heads, max_seq_len, head_dim),
-                dtype=dtype,
-                device=device
-            )
-            for _ in range(num_layers)
-        ]
+    def seq_len(self, layer_idx: int) -> int:
+        """Number of tokens currently cached for ``layer_idx``."""
+        return self._lengths[layer_idx]
 
-    def get_seq_len(self) -> int:
-        """Returns the current sequence length stored in the cache."""
-        return self._current_seq_len
+    def append(self, layer_idx: int, kv: Tuple[torch.Tensor, torch.Tensor]) -> None:
+        """Store the current step's (Key, Value) for ``layer_idx``."""
+        k, v = kv
+        self._keys[layer_idx].append(k)
+        self._values[layer_idx].append(v)
+        self._lengths[layer_idx] += k.shape[-2]
 
-    def update(
-        self,
-        layer_idx: int,
-        key_states: torch.Tensor,
-        value_states: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Updates the cache for a specific layer with new Key/Value states 
-        and returns the full (past + current) Key/Value states for attention.
-
-        Parameters
-        ----------
-        layer_idx : int
-            Index of the current transformer layer.
-        key_states : torch.Tensor
-            Current step's Key tensor. Shape: (batch, num_heads, 1, head_dim)
-        value_states : torch.Tensor
-            Current step's Value tensor. Shape: (batch, num_heads, 1, head_dim)
-
-        Returns
-        -------
-        Tuple[torch.Tensor, torch.Tensor]
-            The full concatenated Key and Value tensors valid for the current step.
-            Shape: (batch, num_heads, current_seq_len + 1, head_dim)
-        """
-        # Ensure we haven't exceeded the buffer
-        batch_size = key_states.shape[0]
-        if self._current_seq_len >= self.max_seq_len:
-            raise ValueError(
-                f"KV Cache is full. Current length: {self._current_seq_len}, "
-                f"Max length: {self.max_seq_len}"
-            )
-
-        # Update cache at the specific slot
-        # self.cache[layer_idx] shape: (2, max_bs, n_heads, max_seq, head_dim)
-        
-        # Insert Key
-        self.cache[layer_idx][0, :batch_size, :, self._current_seq_len : self._current_seq_len + 1, :] = key_states
-        # Insert Value
-        self.cache[layer_idx][1, :batch_size, :, self._current_seq_len : self._current_seq_len + 1, :] = value_states
-
-        # Retrieve the valid portion for attention computation
-        # Note: We slice up to current_len + 1 because we just added the new token
-        k_out = self.cache[layer_idx][0, :batch_size, :, : self._current_seq_len + 1, :]
-        v_out = self.cache[layer_idx][1, :batch_size, :, : self._current_seq_len + 1, :]
-
-        return k_out, v_out
-
-    def increment(self) -> None:
-        """
-        Increments the sequence length pointer. 
-        Must be called ONCE per generation step, after all layers have been processed.
-        """
-        self._current_seq_len += 1
+    def __getitem__(self, layer_idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Return the full (past + current) Key/Value for ``layer_idx``."""
+        if not self._keys[layer_idx]:
+            raise IndexError(f"KVCache layer {layer_idx} is empty.")
+        return (
+            torch.cat(self._keys[layer_idx], dim=-2),
+            torch.cat(self._values[layer_idx], dim=-2),
+        )
 
     def reset(self) -> None:
-        """Resets the cache pointer to zero (does not free memory, just logically resets)."""
-        self._current_seq_len = 0
+        """Drop all cached tensors, logically resetting the cache to empty."""
+        for i in range(len(self._keys)):
+            self._keys[i].clear()
+            self._values[i].clear()
+            self._lengths[i] = 0

@@ -30,9 +30,9 @@ class DeepWindConfig(PretrainedConfig):
         use_load_balance_loss: bool = True,
         aux_loss_weight: float = 0.02,
         use_rotary_emb: bool = False,
-        use_xpos: bool = False,          # 补全：对应 YAML
+        use_xpos: bool = False,          
         use_rms_norm: bool = True,
-        use_patch_stats: bool = False,    # 补全：对应 YAML
+        use_patch_stats: bool = False,    
         
         # --- Attention Logic ---
         variate_atten_every_n_layers: int = 2,
@@ -48,6 +48,11 @@ class DeepWindConfig(PretrainedConfig):
         num_patch_stats: int = 9,
         dense_act_fn: str = "silu",
         use_arcsinh: bool = True,
+
+        # ── Distribution head ──────────────────────────────────────────────
+        pred_head_type:    str   = "quantile",   # "quantile" | "student_t" | "zi_beta" | "gmm"
+        gmm_components:    int   = 3,            # only used when pred_head_type="gmm"
+
         **kwargs,
     ):
         if quantiles is None:
@@ -86,5 +91,9 @@ class DeepWindConfig(PretrainedConfig):
         self.num_patch_stats = num_patch_stats
         self.dense_act_fn = dense_act_fn
         self.use_arcsinh = use_arcsinh
+
+        # Distribution
+        self.pred_head_type  = pred_head_type
+        self.gmm_components  = gmm_components
         
         super().__init__(**kwargs)

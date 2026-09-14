@@ -23,15 +23,16 @@ results_root: "${oc.env:SCRATCH_ROOT}/results"
 
 wandb:
   project: ${project_name}
-  name: ${run_name}
-  tags: []
-  notes: ""
-
+  name:    ${run_name}
+  tags:    []
+  notes:   ""
+  dir:     "${results_root}/${project_name}/wandb_cache"   
+  
 hydra:
   run:
-    dir: ${results_root}/${project_name}/experiments/${run_name}/logs/${now:%Y-%m-%d_%H-%M-%S}
+    dir: "${results_root}/${project_name}/logs/train/${run_name}/${now:%Y-%m-%d_%H-%M-%S}"
   sweep:
-    dir: ${results_root}/${project_name}/experiments/${run_name}/sweeps/${now:%Y-%m-%d_%H-%M-%S}
+    dir: "${results_root}/${project_name}/logs/train/${run_name}/sweeps/${now:%Y-%m-%d_%H-%M-%S}"
     subdir: ${hydra.job.num}
   job:
     chdir: true

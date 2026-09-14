@@ -1,24 +1,22 @@
 #!/bin/bash --login
-#SBATCH --job-name=deepwind_large
-#SBATCH --partition=gpu-dev
-#SBATCH --nodes=2
+#SBATCH --job-name=deepwind_eval
+#SBATCH --partition=gpu
+#SBATCH --nodes=8
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=8
 #SBATCH --exclusive
-#SBATCH --time=1:00:00
+#SBATCH --time=4:00:00
 #SBATCH --account=pawsey0115-gpu
 #SBATCH --output=/scratch/pawsey0115/hwang4/results/DeepWind-Research/slurm-logs/%x-%j.out
 #SBATCH --error=/scratch/pawsey0115/hwang4/results/DeepWind-Research/slurm-logs/%x-%j.err
 
-echo "===== Training job started on $(hostname) at $(date) ====="
+echo "===== Evaluation job started on $(hostname) at $(date) ====="
 
 # ---------------------------------------------------------------------------
 # 1. Host modules
 # ---------------------------------------------------------------------------
 module load pytorch/2.7.1-rocm6.3.3
 module load cray-python
-
-echo "Container: $SINGULARITY_CONTAINER"
 
 # ---------------------------------------------------------------------------
 # 2. Paths and workspace
@@ -31,17 +29,16 @@ export TORCH_EXTENSIONS_DIR="$SCRATCH_ROOT/.torch_extensions_cache"
 
 mkdir -p "$TORCH_EXTENSIONS_DIR"
 mkdir -p "$RESULTS_ROOT/DeepWind-Research/slurm-logs"
-mkdir -p "$RESULTS_ROOT/wandb_cache"
 
 # ---------------------------------------------------------------------------
 # 3. Distributed setup
 # ---------------------------------------------------------------------------
 export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
-export MASTER_PORT=29500
-echo "Master node:  $MASTER_ADDR:$MASTER_PORT"
-echo "Nodes:        $SLURM_JOB_NUM_NODES"
+export MASTER_PORT=29501
+echo "Master node:   $MASTER_ADDR:$MASTER_PORT"
+echo "Nodes:         $SLURM_JOB_NUM_NODES"
 echo "GPUs per node: $SLURM_GPUS_ON_NODE"
-echo "All nodes:    $(scontrol show hostnames $SLURM_JOB_NODELIST | tr '\n' ' ')"
+echo "All nodes:     $(scontrol show hostnames $SLURM_JOB_NODELIST | tr '\n' ' ')"
 
 # ---------------------------------------------------------------------------
 # 4. Container environment
@@ -61,11 +58,9 @@ export SINGULARITYENV_TORCH_NCCL_ASYNC_ERROR_HANDLING=1
 
 export DS_BUILD_AIO=0
 export LIBAIO_DISABLE=1
-export SINGULARITYENV_WANDB_MODE="online"
-export SINGULARITYENV_WANDB_DIR="$RESULTS_ROOT/wandb_cache"
 
 # ---------------------------------------------------------------------------
-# 5. Training command
+# 5. Evaluation command
 # ---------------------------------------------------------------------------
 BIND_PATHS="$PROJECT_ROOT,$VENV_PATH,$SCRATCH_ROOT,$TORCH_EXTENSIONS_DIR"
 
@@ -76,20 +71,12 @@ CMD="export PYTHONPATH=$PROJECT_ROOT:\$PYTHONPATH && \
         --rdzv_id=$SLURM_JOB_ID \
         --rdzv_backend=c10d \
         --rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT \
-    $PROJECT_ROOT/train.py \
-        run_name=deepwind_large_for_compu_cost \
-        model=deepwind_large \
-        data=train \
-        data_eval=eval \
-        training=deepwind_large \
-        training.max_steps=100 \
-        training.gradient_accumulation_steps=2 \
-        training.per_device_train_batch_size=8 \
-        data.dataset_weights.windtoolkit=0.9 \
-        data.dataset_weights.scada=0.1 \
-        model.pred_head_type=quantile"
+    $PROJECT_ROOT/evaluate.py \
+        run_name=deepwind_large_v5 \
+        model_name=deepwind_large_v5 \
+        inference.mqd_infer=true"
 
-echo "Training command: $CMD"
+echo "Evaluation command: $CMD"
 
 # ---------------------------------------------------------------------------
 # 6. Launch via Singularity
@@ -104,5 +91,26 @@ srun \
         bash -c "$CMD"
 
 EXIT_CODE=$?
-echo "===== Training job finished at $(date) with exit code $EXIT_CODE ====="
+echo "===== Evaluation finished at $(date) with exit code $EXIT_CODE ====="
+
+# ---------------------------------------------------------------------------
+# 7. Collect results (single process, no distributed needed)
+# ---------------------------------------------------------------------------
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "Collecting results..."
+    srun -N 1 -n 1 \
+        singularity exec --rocm \
+            --bind "$BIND_PATHS" \
+            "$SINGULARITY_CONTAINER" \
+            bash -c "
+                export PYTHONPATH=$PROJECT_ROOT:\$PYTHONPATH && \
+                ${VENV_PATH}/bin/python $PROJECT_ROOT/tools/collect_results.py \
+                    --results_root $RESULTS_ROOT \
+                    --output       $RESULTS_ROOT/summary/compare_all.csv
+            "
+    echo "Summary saved → $RESULTS_ROOT/summary/compare_all.csv"
+else
+    echo "Evaluation failed (exit $EXIT_CODE) — skipping result collection."
+fi
+
 exit $EXIT_CODE

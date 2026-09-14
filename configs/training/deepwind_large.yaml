@@ -3,7 +3,7 @@
 # Expected: 4 nodes × 8 GPUs (32 GPUs), effective_batch = 32 × 2 × 32 = 2048
 
 # --- Output ---
-output_dir: "${results_root}/${project_name}/checkpoints/${run_name}"
+output_dir: "${results_root}/${project_name}/checkpoints/${model_name}/${run_name}"
 overwrite_output_dir: false
 run_name: ${run_name}
 report_to: "wandb"
@@ -29,7 +29,7 @@ ignore_data_skip: true
 bf16: true
 
 # --- DataLoader ---
-dataloader_num_workers: 8
+dataloader_num_workers: 4
 dataloader_pin_memory: true
 
 # --- Checkpoint ---

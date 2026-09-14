@@ -1,76 +1,85 @@
 # @package _global_
 
-# 1. Load Default Configurations
-# -------------------------------------------------------------------------
 defaults:
   - _self_
-  - model: deepwind          # Load the model architecture configuration
-  - data: wind_test          # Load the test dataset configuration (list of npy files)
+  - model: deepwind_small
 
-# 2. Experiment Identification
-# -------------------------------------------------------------------------
-run_name: "deepwind_patch_16_no_stats"
-seed: 42                     # Fixed seed ensures the same samples are selected for plotting every time
+run_name: "deepwind_small_fix_sharding_v2"
+model_name: "deepwind_small_fix_sharding_v2"
+base_dir: "/scratch/pawsey0115/hwang4/results/DeepWind-Research"
 
+seed: 42
 
-# 4. Inference Parameters
-# -------------------------------------------------------------------------
+data:
+  metadata_path: "/scratch/pawsey0115/hwang4/deepwindData/train_metadata.csv"
+  context_length: 8192
+  stride: null
+  test_npy_paths:
+    # - "/scratch/pawsey0115/hwang4/deepwindData/test/csg_wind_5.npy"
+    #- "/scratch/pawsey0115/hwang4/deepwindData/test/gefc12_wind_7.npy"
+    #- "/scratch/pawsey0115/hwang4/deepwindData/test/gefc14_wind_10.npy"
+    #- "/scratch/pawsey0115/hwang4/deepwindData/test/penmanshiel_15.npy"
+    - "/scratch/pawsey0115/hwang4/deepwindData/test/75354.npy"
+    - "/scratch/pawsey0115/hwang4/deepwindData/test/30651.npy"
+    - "/scratch/pawsey0115/hwang4/deepwindData/test/76016.npy"
+    - "/scratch/pawsey0115/hwang4/deepwindData/test/43458.npy"
+
 inference:
-  batch_size: 8             # Inference consumes less VRAM, so batch size can be larger
-  num_workers: 8             # Number of CPU workers for data loading
-  use_amp: true              # Use Automatic Mixed Precision for faster inference
-  
-  # IMPORTANT: Defines how many steps into the future the model should generate.
-  # Since the model is autoregressive, this must be specified explicitly for evaluation.
-  horizon_h: 
+  batch_size: 4
+  num_workers: 8
+  use_amp: false
+  horizon_h:
     - 1
     - 2
-    #- 3
-    - 4 
-    #- 5 
-    - 6 
-    # - 7 
+    - 4
+    - 6
     - 8
-    #- 9
-    #- 10
-    #- 11
     - 12
-  
-  # Seasonality period for the Naive Baseline metrics (MASE calculation).
-  # e.g., 24 for hourly data with daily cycle, 96 for 15-min data.
-  seasonality: 96      
-  mqd_infer: true 
-  use_kv_cache: null     
-  checkpoint_path: "/scratch/pawsey0115/hwang4/deepwind_experiments/checkpoints/deepwind_patch_16_no_stats"
-  adapter_path: "/scratch/pawsey0115/hwang4/deepwind_experiments/checkpoints/deepwind_patch_16_no_stats_finetune/best_adapter_csg_wind_5" 
-
-# 5. Distributed Settings (DDP)
-# -------------------------------------------------------------------------
+  seasonality_fallback: 96
+  mqd_infer: true
+  use_kv_cache: null
+  checkpoint_path: "${base_dir}/checkpoints/deepwind/${model_name}"
+  adapter_path: null
+  inference_quantiles:
+    - 0.01
+    - 0.05
+    - 0.10
+    - 0.15
+    - 0.20
+    - 0.25
+    - 0.30
+    - 0.35
+    - 0.40
+    - 0.45
+    - 0.50
+    - 0.55
+    - 0.60
+    - 0.65
+    - 0.70
+    - 0.75
+    - 0.80
+    - 0.85
+    - 0.90
+    - 0.95
+    - 0.99
+    
 distributed:
-  backend: "nccl"            # "nccl" for GPU, "gloo" for CPU
-  nproc_per_node: 8          # Number of GPUs per node
-  
-# 6. Output & Visualization Settings
-# -------------------------------------------------------------------------
-output:
-  save_metrics: true         # Save calculated metrics to a JSON file
-  save_plots: false           # Generate and save visualization plots
-  save_raw_results: true
-  # Visualization parameters (passed to src.utils.vis.visualize_forecasts)
-  num_plots: 16              # Number of distinct samples to visualize per dataset file
-  plot_hist_len: 144         # Number of historical time steps to show in the plot (truncates long context)
-  
-  # Explicitly define the output directory on Scratch storage.
-  # Structure: /scratch/.../eval_results/<run_name>/<date_time>/
-  output_dir: "/scratch/pawsey0115/hwang4/deepwind_experiments/baselines/results/${run_name}/"
+  backend: "nccl"
+  nproc_per_node: 8
 
-# 7. Hydra Directory Overrides
-# -------------------------------------------------------------------------
-# Forces Hydra to use the explicit `output_dir` defined above, preventing 
-# the creation of default ./outputs folders in the source directory.
+output:
+  save_metrics:     true
+  save_plots:       false
+  save_raw_results: true
+  num_plots:        4
+  plot_hist_len:    144
+  save_rolling_plots:    true
+  rolling_plot_segment:  720
+  rolling_plot_max_segs:  10
+  output_dir: "${base_dir}/results/deepwind/${run_name}"
+
 hydra:
   run:
     dir: ${output.output_dir}
   job:
-    chdir: true
-    
+    chdir: false

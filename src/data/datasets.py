@@ -43,7 +43,7 @@ class MetadataStore:
         self.lookup: Dict[str, Dict[str, Any]] = {}
         if metadata_path is None:
             return
-
+        
         path = Path(metadata_path)
         if not path.is_file():
             logger.warning(f"[MetadataStore] File not found: {path}")
@@ -170,7 +170,7 @@ def _pad_and_mask(
     else:
         padded = np.zeros((max_vars, seq_len), dtype=np.float32)
         padded[:limit_c, :] = window[:limit_c, :]
-    
+
     # 2. Channel mask -> [max_vars]  (1=real, 0=padding)
     ch_mask = np.zeros(max_vars, dtype=np.float32)
     ch_mask[:limit_c] = 1.0
@@ -656,3 +656,171 @@ class DeepWindEvalDataset(Dataset):
         return _pad_and_mask(
             window, meta, self.max_vars, self.seq_len, self.pad_val_id,
         )
+
+
+@register_dataset("deepwind_test")
+class DeepWindTestDataset(Dataset):
+    """
+    Map-style sliding-window dataset for DeepWindModel evaluation.
+
+    The time axis of each .npy file is split into train / val / test segments
+    according to fixed ratios before any windowing is applied. Only the
+    requested split is indexed, preventing any data leakage across splits.
+
+    Split layout (time axis):
+        |<------ train (0.7) ------>|<- val (0.1) ->|<--- test (0.2) --->|
+        0                        t_train          t_val                   T
+
+    Window layout within the selected split:
+        |<-------- context_length -------->|<-- prediction_length -->|
+        ^                                  ^
+        start (within split)               split point
+
+    Args:
+        npy_path:          Path to a single .npy file of shape (C, T), float32.
+        metadata_path:     Path to the metadata CSV.
+        context_length:    Number of historical time steps fed to the model.
+        prediction_length: Number of future time steps to predict.
+        split:             Which segment to use: "train", "val", or "test".
+        train_ratio:       Fraction of timesteps for training.   Default 0.7.
+        val_ratio:         Fraction of timesteps for validation. Default 0.1.
+        stride:            Step between consecutive window start positions.
+                           Defaults to prediction_length (non-overlapping targets).
+        max_vars:          Channel dimension after padding. Must match training.
+        pad_val_id:        Variate embedding ID used for padded channels.
+    """
+
+    VALID_SPLITS = ("train", "val", "test")
+
+    def __init__(
+        self,
+        npy_path:          str | Path,
+        metadata_path:     str | Path,
+        context_length:    int,
+        prediction_length: int,
+        split:             str = "test",
+        train_ratio:       float = 0.7,
+        val_ratio:         float = 0.1,
+        stride:            Optional[int] = None,
+        max_vars:          int = 6,
+        pad_val_id:        int = 10,
+    ) -> None:
+        super().__init__()
+
+        if split not in self.VALID_SPLITS:
+            raise ValueError(
+                f"split must be one of {self.VALID_SPLITS}, got '{split}'"
+            )
+        if not (0.0 < train_ratio < 1.0 and 0.0 < val_ratio < 1.0):
+            raise ValueError("train_ratio and val_ratio must be in (0, 1).")
+        if train_ratio + val_ratio >= 1.0:
+            raise ValueError("train_ratio + val_ratio must be less than 1.0.")
+
+        self.npy_path          = Path(npy_path)
+        self.context_length    = context_length
+        self.prediction_length = prediction_length
+        self.window_length     = context_length + prediction_length
+        self.split             = split
+        self.stride            = stride if stride is not None else prediction_length
+        self.max_vars          = max_vars
+        self.pad_val_id        = pad_val_id
+
+        if not self.npy_path.is_file():
+            raise FileNotFoundError(f"[DeepWindTest] File not found: {self.npy_path}")
+        if self.stride <= 0:
+            raise ValueError(f"stride must be positive, got {self.stride}")
+
+        # Metadata
+        self.meta_store = MetadataStore(metadata_path)
+        self.meta       = self.meta_store.get(self.npy_path.name)
+
+        # Shape check
+        data = np.load(self.npy_path, mmap_mode="r")
+        if data.ndim != 2:
+            raise ValueError(
+                f"[DeepWindTest] Expected (C, T), got {data.shape} "
+                f"for {self.npy_path.name}"
+            )
+        self._C, self._T = data.shape
+
+        # ── Compute split boundaries (on raw time axis) ───────────────────────
+        t_train = int(self._T * train_ratio)
+        t_val   = int(self._T * (train_ratio + val_ratio))
+        # test runs from t_val to T
+
+        self._split_start, self._split_end = {
+            "train": (0,       t_train),
+            "val":   (t_train, t_val),
+            "test":  (t_val,   self._T),
+        }[split]
+
+        split_len = self._split_end - self._split_start
+        if split_len < self.window_length:
+            fallback_ctx = 512
+            fallback_window = fallback_ctx + self.prediction_length
+            if split_len < fallback_window:
+                raise ValueError(
+                    f"[DeepWindTest] '{split}' split too short even for fallback: "
+                    f"split_len={split_len} < fallback_window={fallback_window} "
+                    f"({self.npy_path.name})."
+                )
+            if is_main_process():
+                logger.warning(
+                    "[DeepWindTest] %s  '%s' split too short for ctx=%d "
+                    "(split_len=%d < window=%d). "
+                    "Falling back to context_length=%d.",
+                    self.npy_path.name, split,
+                    self.context_length, split_len, self.window_length,
+                    fallback_ctx,
+                )
+            self.context_length = fallback_ctx
+            self.window_length  = fallback_window
+
+        # ── Pre-compute window start positions (absolute indices) ─────────────
+        # Windows must not cross the split boundary:
+        #   start >= split_start
+        #   start + window_length <= split_end
+        first_start = self._split_start
+        last_start  = self._split_end - self.window_length
+        self._starts = list(range(first_start, last_start + 1, self.stride))
+
+        if is_main_process():
+            logger.info(
+                "[DeepWindTest] %s  split=%s  "
+                "range=[%d, %d)  split_len=%d  windows=%d  "
+                "ctx=%d  pred=%d  stride=%d",
+                self.npy_path.name, split,
+                self._split_start, self._split_end, split_len,
+                len(self._starts),
+                self.context_length, self.prediction_length, self.stride,
+            )
+
+    # ── Dataset protocol ──────────────────────────────────────────────────────
+
+    def __len__(self) -> int:
+        return len(self._starts)
+
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
+        start = self._starts[idx]
+        split = start + self.context_length
+        end   = split + self.prediction_length
+
+        data        = np.load(self.npy_path, mmap_mode="r")
+        context_raw = np.array(data[:, start:split], dtype=np.float32)
+        target_raw  = np.array(data[:, split:end],   dtype=np.float32)
+
+        sample = _pad_and_mask(
+            window     = context_raw,
+            meta       = self.meta,
+            max_vars   = self.max_vars,
+            seq_len    = self.context_length,
+            pad_val_id = self.pad_val_id,
+        )
+        
+        C             = min(self._C, self.max_vars)
+        target_padded = np.zeros((self.max_vars, self.prediction_length), dtype=np.float32)
+        target_padded[:C, :] = target_raw[:C, :]
+        sample["target"] = target_padded
+        sample["index"] = np.array(idx, dtype=np.int64)
+
+        return sample

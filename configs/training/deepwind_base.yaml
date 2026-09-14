@@ -29,7 +29,7 @@ ignore_data_skip: true
 bf16: true
 
 # --- DataLoader ---
-dataloader_num_workers: 8
+dataloader_num_workers: 4
 dataloader_pin_memory: true
 
 # --- Checkpoint ---

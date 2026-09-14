@@ -1,11 +1,11 @@
 #!/bin/bash --login
-#SBATCH --job-name=deepwind_base_train
-#SBATCH --partition=gpu-highmem
-#SBATCH --nodes=4
+#SBATCH --job-name=deepwind_base_cost
+#SBATCH --partition=gpu-dev
+#SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=8
 #SBATCH --exclusive
-#SBATCH --time=24:00:00
+#SBATCH --time=1:00:00
 #SBATCH --account=pawsey0115-gpu
 #SBATCH --output=/scratch/pawsey0115/hwang4/results/DeepWind-Research/slurm-logs/%x-%j.out
 #SBATCH --error=/scratch/pawsey0115/hwang4/results/DeepWind-Research/slurm-logs/%x-%j.err
@@ -77,11 +77,17 @@ CMD="export PYTHONPATH=$PROJECT_ROOT:\$PYTHONPATH && \
         --rdzv_backend=c10d \
         --rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT \
     $PROJECT_ROOT/train.py \
-        run_name=deepwind_base \
+        run_name=deepwind_base_for_compu_cost \
         model=deepwind_base \
         data=train \
         data_eval=eval \
-        training=deepwind_base"
+        training=deepwind_base \
+        training.max_steps=100 \
+        training.gradient_accumulation_steps=2 \
+        training.per_device_train_batch_size=8 \
+        data.dataset_weights.windtoolkit=0.9 \
+        data.dataset_weights.scada=0.1 \
+        model.pred_head_type=quantile"
 
 echo "Training command: $CMD"
 

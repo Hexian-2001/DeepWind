@@ -38,7 +38,7 @@ class StubConfig:
 @dataclass
 class StubOutput:
     """Mimics the model forward output."""
-    denorm_quantile_preds: torch.Tensor   # (B, V, T_out, Q)
+    pred_params: torch.Tensor   # (B, V, T_out, Q)
 
 
 class StubDeepWindModel(torch.nn.Module):
@@ -58,7 +58,7 @@ class StubDeepWindModel(torch.nn.Module):
         Q = len(self.config.quantiles)
         # Simulate output: model predicts one patch worth of quantiles at each step
         raw = torch.randn(B, V, P, Q, device=context.device)
-        return StubOutput(denorm_quantile_preds=raw)
+        return StubOutput(pred_params=raw)
         
 
 # ---------------------------------------------------------------------------

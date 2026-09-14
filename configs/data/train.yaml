@@ -2,8 +2,8 @@
 # Training data config — matches DeepWindTrainDataset constructor.
 
 # ---- Paths ----
-npy_root: "/scratch/pawsey0115/hwang4/deepwindData/train"
-metadata_path: "/scratch/pawsey0115/hwang4/deepwindData/train_metadata.csv"
+npy_root: "${oc.env:DEEPWIND_DATA_ROOT}/train"
+metadata_path: "${oc.env:DEEPWIND_DATA_ROOT}/train_metadata.csv"
 
 # ---- Sequence ----
 seq_len: ${model.context_length}

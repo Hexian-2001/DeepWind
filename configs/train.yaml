@@ -19,7 +19,7 @@ model_name: "deepwind"
 train_dataset_name: "deepwind_train"
 eval_dataset_name: "deepwind_eval"
 
-results_root: "${oc.env:SCRATCH_ROOT}/results"
+results_root: "${oc.env:DEEPWIND_RUNS_ROOT}"
 
 wandb:
   project: ${project_name}

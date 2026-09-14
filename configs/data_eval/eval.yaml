@@ -3,8 +3,8 @@
 # Supports per-group evaluation via eval_groups list.
 
 # ---- Paths ----
-npy_root: "/scratch/pawsey0115/hwang4/deepwindData/eval"
-metadata_path: "/scratch/pawsey0115/hwang4/deepwindData/eval_metadata.csv"
+npy_root: "${oc.env:DEEPWIND_DATA_ROOT}/eval"
+metadata_path: "${oc.env:DEEPWIND_DATA_ROOT}/eval_metadata.csv"
 
 # ---- Sequence (must match training) ----
 seq_len: ${model.context_length}

@@ -45,7 +45,7 @@ QUANTILE_LEVELS = [
     0.80, 0.85, 0.90, 0.95, 0.99,
 ]
 
-SAVE_PATH = "./paper/figures/reliability_diagram.pdf"
+SAVE_PATH = "./reproduction/figures/reliability_diagram.pdf"
 # ─────────────────────────────────────────────────────────────────────────────
 
 results_dir = Path(RESULTS_DIR)

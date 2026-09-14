@@ -25,7 +25,7 @@ configs/        Hydra model, data, training, and reproduction configurations
 src/            DeepWind model, datasets, training, inference, and evaluation
 scripts/        Local and Pawsey/Setonix launch scripts
 test/           Unit, integration, and data-pipeline checks
-paper/          Scripts used to reproduce paper analyses and figures
+reproduction/   Scripts used to reproduce paper analyses and figures
 tools/          Result collection and operational utilities
 docs/           Data, reproducibility, release, and architecture notes
 ```

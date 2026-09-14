@@ -1,5 +1,5 @@
 """
-paper/benchmark_efficiency.py
+reproduction/benchmark_efficiency.py
 
 Measures inference time, throughput, and peak GPU memory for all three
 DeepWind model variants (Small, Base, Large) across multiple forecasting
@@ -11,12 +11,12 @@ Outputs:
     efficiency_table.csv      — for quick inspection in spreadsheet
 
 Usage:
-    python ./paper/benchmark_efficiency.py \
+    python ./reproduction/benchmark_efficiency.py \
         [--small_ckpt  /path/to/small]  \
         [--base_ckpt   /path/to/base]   \
         [--large_ckpt  /path/to/large]  \
         [--config_path /path/to/eval.yaml] \
-        [--output_dir  ./paper/efficiency_outputs]
+        [--output_dir  ./reproduction/efficiency_outputs]
 """
 
 from __future__ import annotations
@@ -505,7 +505,7 @@ if __name__ == "__main__":
     parser.add_argument("--base_ckpt",   default=os.path.join(experiments_root, "checkpoints/deepwind_base_v1"), help="Path to DeepWind-Base checkpoint")
     parser.add_argument("--large_ckpt",  default=os.path.join(results_root, "checkpoints/deepwind/deepwind_large_v5"), help="Path to DeepWind-Large checkpoint")
     parser.add_argument("--config_path", default=os.path.join(project_root, "configs/eval.yaml"))
-    parser.add_argument("--output_dir",  default="./paper/efficiency_outputs")
+    parser.add_argument("--output_dir",  default="./reproduction/efficiency_outputs")
     # Benchmark settings
     parser.add_argument("--horizons",    type=int, nargs="+",
                         default=HORIZONS_H,

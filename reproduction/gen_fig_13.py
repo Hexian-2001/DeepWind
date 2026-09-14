@@ -1,5 +1,5 @@
 """
-paper/gen_fig13.py
+reproduction/gen_fig13.py
 
 Batch Figure 13 generator for csg_wind_5.
 
@@ -15,7 +15,7 @@ Output layout (--output_dir):
     thumbnail_grid.pdf
 
 Usage:
-    python ./paper/gen_fig13.py \
+    python ./reproduction/gen_fig13.py \
         [--min_boundary_span 5] \
         [--max_figures 30]
 """
@@ -37,7 +37,7 @@ from torch.utils.data import DataLoader
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from paper.moe_analysis import (
+from reproduction.moe_analysis import (
     FILENAME_MAP,
     REGIME_NAMES, REGIME_COLORS, REGIME_SHADE,
     NUM_EXPERTS, PATCH_SIZE, TARGET_MAX_WINDOWS,
@@ -480,7 +480,7 @@ if __name__ == "__main__":
     parser.add_argument("--config_path",       default=os.path.join(project_root, "configs/eval.yaml"))
     parser.add_argument("--npy_root",          default=os.path.join(data_root, "test"))
     parser.add_argument("--metadata_path",     default=os.path.join(data_root, "train_metadata.csv"))
-    parser.add_argument("--output_dir",        default="./paper/fig13_outputs")
+    parser.add_argument("--output_dir",        default="./reproduction/fig13_outputs")
     parser.add_argument("--batch_size",        type=int,   default=4)
     parser.add_argument("--context_length",    type=int,   default=1024)
     parser.add_argument("--prediction_length", type=int,   default=16)

@@ -797,7 +797,7 @@ if __name__ == "__main__":
     parser.add_argument("--config_path",       default=os.path.join(project_root, "configs/eval.yaml"))
     parser.add_argument("--npy_root",          default=os.path.join(data_root, "test"))
     parser.add_argument("--metadata_path",     default=os.path.join(data_root, "train_metadata.csv"))
-    parser.add_argument("--output_dir",        default="./paper/moe_analysis_outputs")
+    parser.add_argument("--output_dir",        default="./reproduction/moe_analysis_outputs")
     parser.add_argument("--batch_size",        type=int, default=4)
     parser.add_argument("--context_length",    type=int, default=8192)
     parser.add_argument("--prediction_length", type=int, default=16)

@@ -41,7 +41,7 @@ ROLLING_PLOT_SEGMENT = 2160
 # Maximum segments to save per dataset/horizon; None = no limit
 ROLLING_PLOT_MAX_SEGS = 20
 
-OUTPUT_DIR = Path("./paper/figures")
+OUTPUT_DIR = Path("./reproduction/figures")
 # ─────────────────────────────────────────────────────────────────────────────
 
 

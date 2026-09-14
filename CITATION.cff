@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use DeepWind, please cite this paper."
+title: "DeepWind: A foundation model for zero-shot wind power forecasting"
+type: article
+authors:
+  - family-names: Wang
+    given-names: Hexian
+  - family-names: Zhou
+    given-names: Tongming
+  - family-names: Jia
+    given-names: Chengzhen
+  - family-names: Liu
+    given-names: Yushan
+  - family-names: Wang
+    given-names: Lingmei
+doi: 10.1016/j.energy.2026.141793
+journal: Energy
+volume: "360"
+year: 2026
+repository-code: "https://github.com/Hexian-2001/DeepWind"
+license: Apache-2.0

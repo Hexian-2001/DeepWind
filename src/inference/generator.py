@@ -348,7 +348,11 @@ class DeepWindForecaster:
             return grids[inference_quantiles]
 
         # Try cfg
-        cfg_q = self.cfg.inference.get("inference_quantiles", None)
+        # Lightweight callers and unit tests may pass a config without an
+        # ``inference`` section.  Treat it as an empty section instead of
+        # requiring evaluation-only configuration for the core forecaster.
+        inference_cfg = self.cfg.get("inference", {})
+        cfg_q = inference_cfg.get("inference_quantiles", None)
         if cfg_q is not None:
             return np.asarray(cfg_q, dtype=np.float64)
 

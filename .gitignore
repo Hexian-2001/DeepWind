@@ -6,6 +6,7 @@
 *.h5
 *.parquet
 *.csv
+!examples/**/*.csv
 
 # Python
 __pycache__/
@@ -25,7 +26,14 @@ outputs/
 results/
 wandb/
 runs/
+.coverage
+.pytest_cache/
+.ruff_cache/
 
 # Env
 .env
 *.env
+
+# Local operational inventories and release staging
+.private/
+release-staging/

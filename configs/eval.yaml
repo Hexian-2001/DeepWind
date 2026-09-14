@@ -15,10 +15,14 @@ data:
   context_length: 8192
   stride: null
   test_npy_paths:
-    - "${oc.env:DEEPWIND_DATA_ROOT}/test/75354.npy"
     - "${oc.env:DEEPWIND_DATA_ROOT}/test/30651.npy"
-    - "${oc.env:DEEPWIND_DATA_ROOT}/test/76016.npy"
     - "${oc.env:DEEPWIND_DATA_ROOT}/test/43458.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/75354.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/76016.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/csg_wind_5.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/gefc12_wind_7.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/gefc14_wind_10.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/penmanshiel_15.npy"
 
 inference:
   batch_size: 4

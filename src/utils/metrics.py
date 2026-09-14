@@ -407,12 +407,15 @@ class ForecastingEvaluator:
         y_pred:       np.ndarray,
         y_quantiles:  np.ndarray,
         capacity:     np.ndarray,
+        qualified_rate_threshold: float = 0.15,
     ) -> Dict[str, float]:
         metrics: Dict[str, float] = {
             "nCRPS":          self.calc_ncrps(y_true, y_quantiles, capacity),
             "nMAE":           self.calc_nmae(y_true, y_pred, capacity),
             "Accuracy":       self.calc_grid_accuracy(y_true, y_pred, capacity),
-            "Qualified_Rate": self.calc_qualified_rate(y_true, y_pred, capacity),
+            "Qualified_Rate": self.calc_qualified_rate(
+                y_true, y_pred, capacity, threshold=qualified_rate_threshold
+            ),
             "MAE_Coverage":   self.calc_mae_coverage(y_true, y_quantiles),
             "R2":             self.calc_r2(y_true, y_pred),           # 新增
         }

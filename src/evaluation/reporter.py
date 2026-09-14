@@ -114,7 +114,7 @@ class EvaluationReporter:
 
         capacity_array = self._make_capacity_array(results["targets"], capacity_val)
 
-        metrics = self._compute_metrics(results, capacity_array, dataset_name)
+        metrics = self._compute_metrics(results, capacity_array, dataset_name, horizon_h)
         self._save_metrics(metrics, dataset_name, horizon_h, pred_len)
 
         if self.cfg.output.get("save_rolling_plots", False):
@@ -159,6 +159,7 @@ class EvaluationReporter:
         results:      Dict[str, np.ndarray],
         capacity:     np.ndarray,
         dataset_name: str,
+        horizon_h:    int,
     ) -> Dict:
         """
         Compute all standard forecasting metrics via ForecastingEvaluator.
@@ -182,7 +183,19 @@ class EvaluationReporter:
             y_pred      = results["point_preds"],    # (N, pred_len)
             y_quantiles = results["quantile_preds"], # (N, pred_len, Q)
             capacity    = capacity,                  # (N,)
+            qualified_rate_threshold=self._qualified_rate_threshold(horizon_h),
         )
+
+    @staticmethod
+    def _qualified_rate_threshold(horizon_h: int) -> float:
+        """
+        Tolerance band for the Qualified Rate metric, in fractions of capacity.
+
+        0.15 for ultra-short-term (≤ 4 h ahead), 0.25 for short-term /
+        day-ahead horizons (> 4 h), following the convention documented in
+        `ForecastingEvaluator.calc_qualified_rate`.
+        """
+        return 0.15 if horizon_h <= 4 else 0.25
 
     # ── Persistence ────────────────────────────────────────────────────────────
     

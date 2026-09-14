@@ -11,7 +11,7 @@ base_dir: "${oc.env:DEEPWIND_RUNS_ROOT}"
 seed: 42
 
 data:
-  metadata_path: "${oc.env:DEEPWIND_DATA_ROOT}/train_metadata.csv"
+  metadata_path: "${oc.env:DEEPWIND_DATA_ROOT}/test_metadata.csv"
   context_length: 8192
   stride: null
   test_npy_paths:

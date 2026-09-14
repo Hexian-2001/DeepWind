@@ -1,6 +1,8 @@
 # configs/training/deepwind_base.yaml
 # Training config for DeepWind-Base
-# Expected: 4 nodes × 8 GPUs (32 GPUs), effective_batch = 16 × 4 × 32 = 2048
+# Paper-exact protocol: 4 nodes × 8 GPUs (32 GPUs),
+# global batch = 4 × 2 × 32 = 256, 100,000 steps, peak LR 1e-4,
+# warmup 3% (3000 steps), cosine decay, grad clip 1.0, BF16.
 
 # --- Output ---
 output_dir: "${results_root}/${project_name}/checkpoints/${model_name}/${run_name}"
@@ -9,16 +11,16 @@ run_name: ${run_name}
 report_to: "wandb"
 
 # --- Optimization ---
-learning_rate: 1.5e-4
+learning_rate: 1e-4
 weight_decay: 0.01
 adam_beta1: 0.9
 adam_beta2: 0.95
 max_grad_norm: 1.0
 
 # --- Batch Size & Steps ---
-per_device_train_batch_size: 16
-gradient_accumulation_steps: 4
-max_steps: 100000 
+per_device_train_batch_size: 4
+gradient_accumulation_steps: 2
+max_steps: 100000
 lr_scheduler_type: "cosine"
 warmup_ratio: 0.03
 

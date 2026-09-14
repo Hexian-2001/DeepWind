@@ -28,7 +28,9 @@ module list 2> "${run_dir}/metadata/modules.txt"
 
 master_addr="$(scontrol show hostnames "${SLURM_JOB_NODELIST}" | head -n 1)"
 master_port="$((20000 + SLURM_JOB_ID % 20000))"
-gpus_per_node="${SLURM_GPUS_ON_NODE:-2}"
+# `--exclusive` can make SLURM_GPUS_ON_NODE report the node capacity rather
+# than this smoke test's requested GRES. Keep the intended process count explicit.
+gpus_per_node=2
 
 export SINGULARITYENV_DEEPWIND_DATA_ROOT="${DEEPWIND_DATA_ROOT}"
 export SINGULARITYENV_DEEPWIND_RUNS_ROOT="${DEEPWIND_RUNS_ROOT}"

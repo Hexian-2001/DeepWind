@@ -23,7 +23,7 @@ The canonical non-destructive view is now:
 /scratch/pawsey0115/hwang4/datasets/wind_power/deepwind_corpus_v1
 /scratch/pawsey0115/hwang4/projects/deepwind/
 ├── checkpoints/paper/deepwind-large
-├── legacy/{experiments,paper-results,early-logs}
+├── legacy/{experiments,paper-results,early-logs,comparison-baselines,summary}
 ├── logs/
 ├── release/
 ├── reports/
@@ -34,3 +34,23 @@ The canonical non-destructive view is now:
 These entries are symlinks or new empty directories. No legacy asset has been
 deleted, renamed, or copied. De-duplication is deferred until checksums, release
 artifacts, and paper-result provenance are verified.
+
+The legacy view also links `comparison-baselines` and `summary`, which were
+found outside directories containing the DeepWind name. The experiment
+catalogue at
+`/scratch/pawsey0115/hwang4/projects/deepwind/reports/experiment-catalog-2026-09-14.json`
+currently identifies 23 Trainer runs.
+
+## De-duplication candidate (no deletion performed)
+
+The two `deepwind_large_v5` checkpoint trees below are each approximately
+80 GB, contain the same 128 relative file names and sizes, and have matching
+hashes for the root model configuration and safetensors index:
+
+```text
+/scratch/pawsey0115/hwang4/deepwind_experiments/checkpoints/deepwind_large_v5
+/scratch/pawsey0115/hwang4/results/DeepWind-Research/checkpoints/deepwind/deepwind_large_v5
+```
+
+They remain untouched. Payload checksums for every file and explicit owner
+approval are required before replacing one tree with a symlink or removing it.

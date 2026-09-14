@@ -84,7 +84,7 @@ configs (`${oc.env:...}`) and analysis scripts (`os.environ.get(...)`).
 
 ## Phase 5 — User-facing inference CLI (point 4)
 
-- [ ] Add a standalone `infer.py` (or `scripts/infer.py`) that loads a
+- [x] Add a standalone `infer.py` (or `scripts/infer.py`) that loads a
       checkpoint (+ optional LoRA adapter) and produces a single-site forecast
       from a `.npy` file or inline array, with `--output` JSON/NPZ.
 
@@ -99,20 +99,34 @@ configs (`${oc.env:...}`) and analysis scripts (`os.environ.get(...)`).
 
 ## Phase 7 — Data hygiene (points 3, 6)
 
-- [ ] Split `train_metadata.csv` into `train_metadata.csv` /
-      `eval_metadata.csv` / `test_metadata.csv` manifests.
-- [ ] Fix 3 trailing-space `dataset` values (`windtoolkit `, `windtoolkit  `,
-      `scada `).
-- [ ] Add a split-isolation audit script.
+- [x] Train/eval/test manifests already exist on scratch (127455 / 150 / 15
+      rows) — no split needed.
+- [x] Fix 3 trailing-space `dataset` values + drop 158 stale train-manifest
+      rows + resolve the 7 leaked test files. Applied with
+      `tools/clean_data_manifests.py` (idempotent, `--dry-run`, timestamped
+      backups). The 7 leaked files (`15321`, `47663`, `115915`,
+      `csg_wind_6`, `opsd_eu_15t_{18,19}`, `kelmarsh_6`) are **kept in
+      `train/`** (participate in pretraining) and removed from `test/`; the
+      byte-identical `test/` copies were quarantined to `_removed_from_test/`.
+      Final: train 127297, eval 150, test 8 (paper's WindBench). Audit now
+      PASSES.
+- [x] Add a split-isolation audit script (`tools/audit_data_splits.py`).
 
 ## Phase 8 — Scratch path standardisation & de-dup (point 6)
 
-- [ ] Verify canonical symlinks under `/scratch/.../projects/deepwind/`.
-- [ ] De-dup the two ~80 GB `deepwind_large_v5` trees (checksums first).
-- [ ] Remove legacy paths only after verification. **Do not move the corpus.**
+- [x] Verify canonical symlinks under `/scratch/.../projects/deepwind/`
+      (`legacy/` holds symlinks to `deepwind`, `deepwind_experiments`,
+      `baselines`, `results/DeepWind-Research`, `results/summary`).
+- [x] De-dup the two ~80 GB `deepwind_large_v5` checkpoint trees: full md5
+      (128 files × 2) byte-identical; deleted the old
+      `deepwind_experiments/checkpoints/deepwind_large_v5` copy, kept
+      `results/DeepWind-Research/checkpoints/deepwind/deepwind_large_v5`.
+- [x] Removed only the verified-duplicate; corpus untouched.
 
 ## Phase 9 — Security & release (point 7)
 
-- [ ] Revoke the plaintext HF token in `hf_utils/upload_to_hf.py`.
+- [x] Remove the plaintext HF token in `hf_utils/upload_to_hf.py`
+      (replaced with `os.environ["HF_TOKEN"]`; verified not in repo or git
+      history). **Action required: rotate the token on huggingface.co.**
 - [ ] Push `release/open-source-v1` to GitHub (needs auth).
 - [ ] Retrain Small/Base/Large to paper spec (RoPE+xPOS=true, λ=0.02).

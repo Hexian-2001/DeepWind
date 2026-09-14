@@ -44,41 +44,43 @@ configs (`${oc.env:...}`) and analysis scripts (`os.environ.get(...)`).
 
 ---
 
-## Phase 0 — Environment (point 8) — *done / in verification*
+## Phase 0 — Environment (point 8) — *done*
 
 - [x] Build a self-hosted conda env at `$DEEPWIND_VENV` on `/scratch`
       (miniforge3 + pip `torch==2.7.1` ROCm 6.3 wheels + full stack).
 - [x] Pin the verified transformer stack (`transformers`, `peft`,
       `accelerate`).
-- [ ] GPU smoke test outside the Singularity container (in flight).
+- [x] GPU smoke test outside the Singularity container — MI250X,
+      torch 2.7.1+rocm6.3: fwd/bwd + `save_pretrained`/`from_pretrained`
+      round-trip + LoRA injection all OK.
 
 ## Phase 1 — Internationalise to English (point 9)
 
-- [ ] Translate the 11 Chinese comments across 6 files
+- [x] Translate the 11 Chinese comments across 6 files
       (`notebooks/debug_model.ipynb`, `paper/gen_fig_13.py`,
       `src/inference/generator.py`, `src/layers/heads.py`,
       `src/layers/norm.py`, `src/utils/metrics.py`).
 
 ## Phase 2 — Packaging hygiene (industrial-grade)
 
-- [ ] Add missing `accelerate` dependency to `pyproject.toml`.
-- [ ] Fix copy-paste header comments in `configs/training/*.yaml`.
-- [ ] Make `deepwind_base.yaml` `output_dir` consistent with small/large
+- [x] Add missing `accelerate` dependency to `pyproject.toml`.
+- [x] Fix copy-paste header comments in `configs/training/*.yaml`.
+- [x] Make `deepwind_base.yaml` `output_dir` consistent with small/large
       (include `${model_name}`).
 
 ## Phase 3 — De-hardcode paths (points 3, 6)
 
-- [ ] Replace hardcoded `/scratch/...` defaults in `paper/*.py` and
+- [x] Replace hardcoded `/scratch/...` defaults in `paper/*.py` and
       `tools/*.py` with `os.environ.get("DEEPWIND_*", <legacy default>)`.
-- [ ] Fix stale `project_codes/deepwind_research/configs/eval.yaml` references
+- [x] Fix stale `project_codes/deepwind_research/configs/eval.yaml` references
       to point at `$DEEPWIND_PROJECT_ROOT/configs/eval.yaml`.
 
 ## Phase 4 — Finetune entry-point refactor (points 4, 5)
 
-- [ ] Rewrite `finetune.py` to use Hydra + `DeepWindTrainer` + WandB + the
+- [x] Rewrite `finetune.py` to use Hydra + `DeepWindTrainer` + WandB + the
       registry, matching `train.py`'s standard. Preserve LoRA r=16 / α=32,
       AdamW lr=1e-4, grad-clip 1.0, cosine schedule.
-- [ ] Add `configs/finetune.yaml` (and a data config).
+- [x] Add `configs/finetune.yaml` (and a data config).
 
 ## Phase 5 — User-facing inference CLI (point 4)
 

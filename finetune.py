@@ -1,312 +1,218 @@
-#import os
-#import torch
-#from torch.utils.data import DataLoader
-#from tqdm import tqdm
-#import argparse
-#
-#from src.models.deepwind import DeepWindModel
-#from src.models.adapter import apply_finetune_strategy
-#from src.data.datasets import DeepWindFinetuneDataset
-#
-#def main(args):
-#    # --------------------------------------------------------------------------
-#    # 1. Setup & Device
-#    # --------------------------------------------------------------------------
-#    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#    print(f"[{args.site_name}] Starting fine-tuning on {device}...")
-#    
-#    os.makedirs(args.output_dir, exist_ok=True)
-#
-#    # --------------------------------------------------------------------------
-#    # 2. Load Pre-trained Foundation Model
-#    # --------------------------------------------------------------------------
-#    print("Loading Foundation Model...")
-#    # Initialize config and model structure
-#    model = DeepWindModel.from_pretrained(args.pretrained_path)
-#    config = model.config
-#    # --------------------------------------------------------------------------
-#    # 3. Apply Fine-tuning Strategy (PEFT + Head)
-#    # --------------------------------------------------------------------------
-#    print("Applying PEFT Strategy (Variate-LoRA + Router-Full + Head-Full)...")
-#    # This function wraps the model with LoRA and sets requires_grad correctly
-#    model = apply_finetune_strategy(model, lora_r=16)
-#    model.to(device)
-#
-#    # --------------------------------------------------------------------------
-#    # 4. Prepare Few-shot Data
-#    # --------------------------------------------------------------------------
-#    print(f"Loading few-shot data from {args.data_path}...")
-#    dataset = DeepWindFinetuneDataset(
-#        npy_path=args.data_path,
-#        metadata_path=args.metadata_path,
-#        context_length=config.context_length,
-#        stride=args.stride,
-#        finetune_rate=args.finetune_rate
-#    )
-#    print(f"total samples: {len(dataset)}")
-#    
-#    dataloader = DataLoader(
-#        dataset, 
-#        batch_size=args.batch_size, 
-#        shuffle=True, 
-#        num_workers=4,
-#        pin_memory=True
-#    )
-#
-#    # --------------------------------------------------------------------------
-#    # 5. Optimizer
-#    # --------------------------------------------------------------------------
-#    # IMPORTANT: Only pass trainable parameters to the optimizer!
-#    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=1e-4)
-#
-#    # Optional: Learning Rate Scheduler (Warmup then Cosine is standard)
-#    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
-#
-#    # --------------------------------------------------------------------------
-#    # 6. Training Loop
-#    # --------------------------------------------------------------------------
-#    model.train()
-#    best_loss = float('inf')
-#    
-#    for epoch in range(args.epochs):
-#        epoch_loss = 0.0
-#        progress_bar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{args.epochs}")
-#        
-#        for batch in progress_bar:
-#            # Move data to GPU
-#            context = batch['context'].to(device)
-#            variate_ids = batch['variate_ids'].to(device)
-#            channel_mask = batch['channel_mask'].to(device)
-#            site_coords = batch['site_coords'].to(device)
-#            has_coords = batch['has_coords'].to(device)
-#
-#            optimizer.zero_grad()
-#            
-#            # Forward pass
-#            # Note: Ensure your model forward returns (loss, output) or calculate loss here
-#            outputs = model(
-#                context=context,
-#                variate_ids=variate_ids,
-#                channel_mask=channel_mask,
-#                site_coords=site_coords,
-#                has_coords=has_coords
-#            ) 
-#            
-#            # Assuming your model definition includes the criterion internally
-#            # Or you compute it externally:
-#            loss = outputs.loss
-#            loss.backward()
-#            
-#            # Gradient Clipping (Essential for stable fine-tuning)
-#            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-#            
-#            optimizer.step()
-#            
-#            epoch_loss += loss.item()
-#            progress_bar.set_postfix({"loss": f"{loss.item():.4f}"})
-#        
-#        scheduler.step()
-#        avg_loss = epoch_loss / len(dataloader)
-#        print(f"Epoch {epoch+1} Average Loss: {avg_loss:.4f}")
-#
-#        # ----------------------------------------------------------------------
-#        # 7. Checkpointing
-#        # ----------------------------------------------------------------------
-#        # Save only if loss improved
-#        if avg_loss < best_loss:
-#            best_loss = avg_loss
-#
-#            save_path = os.path.join(args.output_dir, f"best_adapter_{args.site_name}")
-#            os.makedirs(save_path, exist_ok=True)
-#
-#            # Save ONLY the adapter weights (not the whole backbone) to save space
-#            model.save_pretrained(save_path) 
-#            print(f"[Saved best adapter to] {save_path}")
-#
-#if __name__ == "__main__":
-#    parser = argparse.ArgumentParser()
-#    parser.add_argument("--site_name", type=str, required=True, help="Name of the target wind farm")
-#    parser.add_argument("--data_path", type=str, required=True, help="Path to few-shot csv")
-#    parser.add_argument("--metadata_path", type=str, required=True, help="Path to metadata csv")
-#    parser.add_argument("--pretrained_path", type=str, required=True, help="Path to foundation model #checkpoint")
-#    parser.add_argument("--output_dir", type=str, default="./checkpoints/finetune")
-#    parser.add_argument("--epochs", type=int, default=10, help="Few-shot usually needs fewer epochs (e.g. #10-20)")
-#    parser.add_argument("--batch_size", type=int, default=4)
-#    parser.add_argument("--learning_rate", type=float, default=1e-4, help="Use smaller LR than pretraining")
-#    parser.add_argument("--stride", type=int, default=32)
-#    parser.add_argument("--finetune_rate", type=float, default=1.0)
-#    
-#    args = parser.parse_args()
-#    main(args)
+"""
+finetune.py
+Entry point for few-shot fine-tuning of DeepWindModel via LoRA (PEFT).
 
+The previous hand-rolled DDP training loop is replaced with the same
+industrial-grade stack used by ``train.py``:
 
+    * Hydra config (``configs/finetune.yaml``)
+    * ``DeepWindTrainer`` (handles loss extraction for embedded targets)
+    * WandB experiment tracking
+    * the dataset registry (``deepwind_finetune``)
+
+Fine-tuning strategy (unchanged from the original implementation):
+    * LoRA on the variate-attention QKV / output projections (r=16, α=32)
+    * full fine-tuning of the MoE router and the prediction head
+    * AdamW lr=1e-4, grad-clip 1.0, cosine schedule
+
+The foundation checkpoint is loaded with ``DeepWindModel.from_pretrained`` and
+only the adapter (+ router/head) weights are written back by ``Trainer``.
+"""
+from __future__ import annotations
+
+import atexit
+import logging
 import os
-import torch
+
+import hydra
 import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import DataLoader, DistributedSampler
-from tqdm import tqdm
-import argparse
+import transformers
+import wandb
+from omegaconf import DictConfig, OmegaConf
+from transformers import (
+    TrainingArguments,
+    default_data_collator,
+    set_seed,
+)
+from transformers.trainer_utils import get_last_checkpoint
 
-# --- DeepWind Project Imports ---
-from src.models.deepwind import DeepWindModel
+from src.data.datasets import *
+from src.models.configuration import *
+from src.models.deepwind import *
 from src.models.adapter import apply_finetune_strategy
-from src.data.datasets import DeepWindFinetuneDataset
+from src.utils.distributed import cleanup_ddp, is_main_process
+from src.utils.registry import DATASET_REGISTRY
+from src.utils.trainer import DeepWindTrainer
 
-def setup_distributed():
-    """Initializes the distributed process group and sets the device."""
-    if "LOCAL_RANK" not in os.environ:
-        # Fallback for non-distributed running
-        return -1
-    
-    dist.init_process_group(backend="nccl")
-    local_rank = int(os.environ["LOCAL_RANK"])
-    torch.cuda.set_device(local_rank)
-    return local_rank
+logger = logging.getLogger(__name__)
 
-def cleanup():
-    """Destroys the process group."""
-    if dist.is_initialized():
-        dist.destroy_process_group()
 
-def main(args):
-    # 1. Setup Distributed Environment
-    local_rank = setup_distributed()
-    is_distributed = (local_rank != -1)
-    
-    if is_distributed:
-        device = torch.device(f"cuda:{local_rank}")
-        world_size = dist.get_world_size()
-        is_main_process = (local_rank == 0)
-    else:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        world_size = 1
-        is_main_process = True
+# ---------------------------------------------------------------------------
+# Setup helpers (shared semantics with train.py)
+# ---------------------------------------------------------------------------
 
-    if is_main_process:
-        print(f"[{args.site_name}] Starting {'DDP ' if is_distributed else ''}fine-tuning...")
-        os.makedirs(args.output_dir, exist_ok=True)
 
-    # 2. Load Foundation Model
-    if is_main_process:
-        print(f"Loading Foundation Model from {args.pretrained_path}...")
-    model = DeepWindModel.from_pretrained(args.pretrained_path)
-    config = model.config
-
-    # 3. Apply Fine-tuning Strategy (PEFT)
-    model = apply_finetune_strategy(model, lora_r=16)
-    model.to(device)
-
-    # Wrap with DDP if multiple GPUs are used
-    if is_distributed:
-        model = DDP(model, device_ids=[local_rank], output_device=local_rank)
-
-    # 4. Prepare Dataset and Distributed Sampler
-    dataset = DeepWindFinetuneDataset(
-        npy_path=args.data_path,
-        metadata_path=args.metadata_path,
-        context_length=config.context_length,
-        stride=args.stride,
-        finetune_rate=args.finetune_rate
+def _setup_logging(cfg: DictConfig) -> None:
+    """Configure transformers logging for rank-0 only, suppressing duplicates."""
+    raw_level: str = (
+        cfg.get("training", {}).get("log_level", "info") or "info"
     )
-    if is_main_process:
-        print(f"[Finetune dataset] total samples: {len(dataset)}")
-    
-    sampler = DistributedSampler(dataset, shuffle=True) if is_distributed else None
-    
-    dataloader = DataLoader(
-        dataset, 
-        batch_size=args.batch_size, 
-        sampler=sampler,
-        shuffle=(sampler is None), # Only shuffle if not using a sampler
-        num_workers=4,
-        pin_memory=True
+    log_level: int = logging.getLevelName(raw_level.upper())
+    if not isinstance(log_level, int):
+        log_level = logging.INFO
+
+    transformers.utils.logging.disable_default_handler()
+    transformers.utils.logging.set_verbosity(log_level)
+    transformers.logging.get_logger("transformers").propagate = False
+
+
+def _setup_wandb(cfg: DictConfig) -> None:
+    """Initialise a wandb run on rank 0 (see train.py for rationale)."""
+    wandb_cfg = cfg.get("wandb", {})
+    wandb.init(
+        project=wandb_cfg.get("project", cfg.project_name),
+        name=wandb_cfg.get("name", cfg.run_name),
+        id=wandb_cfg.get("id", cfg.run_name),
+        tags=list(wandb_cfg.get("tags") or []),
+        notes=wandb_cfg.get("notes") or "",
+        config=OmegaConf.to_container(cfg, resolve=True),
+        resume="allow",
+    )
+    logger.info("wandb run: %s", wandb.run.url)
+
+
+def _detect_checkpoint(
+    output_dir: str,
+    training_args: TrainingArguments,
+) -> str | None:
+    """Return the path to the last checkpoint, or ``None`` (see train.py)."""
+    if not os.path.isdir(output_dir):
+        return None
+    if training_args.overwrite_output_dir:
+        return None
+
+    last_ckpt = get_last_checkpoint(output_dir)
+    if last_ckpt and training_args.resume_from_checkpoint is None:
+        if is_main_process():
+            logger.info(
+                "Checkpoint detected: %s. Resuming fine-tuning. "
+                "Set overwrite_output_dir=true to start fresh.",
+                last_ckpt,
+            )
+    return last_ckpt
+
+
+# ---------------------------------------------------------------------------
+# Model / dataset factories
+# ---------------------------------------------------------------------------
+
+
+def _build_model(cfg: DictConfig):
+    """Load the foundation checkpoint and inject the LoRA adapter.
+
+    Returns
+    -------
+    (model, context_length)
+        ``model`` is a ``PeftModel`` ready for training; ``context_length`` is
+        read from the *loaded* checkpoint so the dataset window always matches
+        the foundation model's patching (not the YAML default).
+    """
+    pretrained_path = cfg.finetune.pretrained_path
+    if is_main_process():
+        logger.info("Loading foundation model from %s", pretrained_path)
+
+    base_model = DeepWindModel.from_pretrained(pretrained_path)
+    context_length = base_model.config.context_length
+
+    model = apply_finetune_strategy(
+        base_model,
+        lora_r=cfg.finetune.lora_r,
+        lora_alpha=cfg.finetune.lora_alpha,
+    )
+    return model, context_length
+
+
+def _build_train_dataset(cfg: DictConfig, context_length: int):
+    """Instantiate the few-shot dataset from the registry."""
+    DatasetClass = DATASET_REGISTRY.get(cfg.train_dataset_name)
+    data_args: dict = OmegaConf.to_container(cfg.data, resolve=True)
+    # Authoritative context length comes from the loaded checkpoint.
+    data_args["context_length"] = context_length
+
+    if is_main_process():
+        logger.info(
+            "Finetune dataset: %s (context_length=%d)",
+            cfg.train_dataset_name,
+            context_length,
+        )
+    return DatasetClass(**data_args)
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+
+@hydra.main(version_base=None, config_path="configs", config_name="finetune")
+def main(cfg: DictConfig) -> None:
+    atexit.register(cleanup_ddp)
+    OmegaConf.resolve(cfg)
+
+    # Silence wandb on non-main processes before any import side-effects.
+    if not is_main_process():
+        os.environ["WANDB_MODE"] = "disabled"
+
+    # 1. Logging & reproducibility
+    _setup_logging(cfg)
+    set_seed(cfg.seed)
+
+    if is_main_process():
+        logger.info("Finetune run: %s", cfg.run_name)
+        logger.info("Config:\n%s", OmegaConf.to_yaml(cfg, resolve=True))
+
+    # 2. Training arguments & checkpoint detection
+    training_args = TrainingArguments(
+        **OmegaConf.to_container(cfg.training, resolve=True)
+    )
+    last_checkpoint = _detect_checkpoint(training_args.output_dir, training_args)
+
+    # 3. wandb (rank-0 only)
+    if is_main_process() and training_args.report_to and "wandb" in training_args.report_to:
+        _setup_wandb(cfg)
+
+    # 4. Model & dataset
+    model, context_length = _build_model(cfg)
+    train_dataset = _build_train_dataset(cfg, context_length)
+
+    # 5. Trainer
+    trainer = DeepWindTrainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset,
+        data_collator=default_data_collator,
     )
 
-    # 5. Optimizer and Scheduler
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
+    # 6. Synchronise all ranks before training begins
+    if dist.is_available() and dist.is_initialized():
+        dist.barrier()
 
-    # 6. Training Loop
-    model.train()
-    best_loss = float('inf')
-    
-    for epoch in range(args.epochs):
-        if is_distributed:
-            sampler.set_epoch(epoch) # Important for shuffling
-        
-        epoch_loss = 0.0
-        
-        # Setup progress bar only for rank 0
-        data_iterator = tqdm(dataloader, desc=f"Epoch {epoch+1}/{args.epochs}") if is_main_process else dataloader
-        
-        for batch in data_iterator:
-            context = batch['context'].to(device)
-            variate_ids = batch['variate_ids'].to(device)
-            channel_mask = batch['channel_mask'].to(device)
-            site_coords = batch['site_coords'].to(device)
-            has_coords = batch['has_coords'].to(device)
+    if is_main_process():
+        logger.info("Starting fine-tuning...")
 
-            optimizer.zero_grad(set_to_none=True)
-            
-            outputs = model(
-                context=context,
-                variate_ids=variate_ids,
-                channel_mask=channel_mask,
-                site_coords=site_coords,
-                has_coords=has_coords
-            ) 
-            
-            loss = outputs.loss
-            loss.backward()
-            
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
-            
-            current_loss = loss.item()
-            epoch_loss += current_loss
-            
-            # Update tqdm postfix correctly
-            if is_main_process:
-                data_iterator.set_postfix({"loss": f"{current_loss:.4f}"})
-        
-        scheduler.step()
-        
-        # --- Aggregate Loss Across All Ranks ---
-        total_loss_tensor = torch.tensor(epoch_loss).to(device)
-        if is_distributed:
-            dist.all_reduce(total_loss_tensor, op=dist.ReduceOp.SUM)
-            # Average over total number of batches across all GPUs
-            avg_loss = total_loss_tensor.item() / (len(dataloader) * world_size)
-        else:
-            avg_loss = epoch_loss / len(dataloader)
+    checkpoint = training_args.resume_from_checkpoint or last_checkpoint
+    train_result = trainer.train(resume_from_checkpoint=checkpoint)
 
-        # 7. Checkpointing (Rank 0 only)
-        if is_main_process:
-            print(f"Epoch {epoch+1} Avg Loss: {avg_loss:.4f}")
-            if avg_loss < best_loss:
-                best_loss = avg_loss
-                save_path = os.path.join(args.output_dir, f"best_adapter_{args.site_name}")
-                
-                # Unmask DDP model to save via PEFT's save_pretrained
-                model_to_save = model.module if hasattr(model, "module") else model
-                model_to_save.save_pretrained(save_path) 
-                print(f"[Best Model Saved] {save_path}")
+    # 7. Persist artefacts (adapter + router/head only, via PeftModel)
+    trainer.save_model()
+    trainer.log_metrics("train", train_result.metrics)
+    trainer.save_metrics("train", train_result.metrics)
+    trainer.save_state()
 
-    cleanup()
+    if is_main_process():
+        logger.info("Fine-tuning completed.")
+        if wandb.run is not None:
+            wandb.finish()
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="DeepWind Distributed Fine-tuning")
-    parser.add_argument("--site_name", type=str, required=True)
-    parser.add_argument("--data_path", type=str, required=True)
-    parser.add_argument("--metadata_path", type=str, required=True)
-    parser.add_argument("--pretrained_path", type=str, required=True)
-    parser.add_argument("--output_dir", type=str, default="./checkpoints/finetune")
-    parser.add_argument("--epochs", type=int, default=30)
-    parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--learning_rate", type=float, default=1e-4)
-    parser.add_argument("--stride", type=int, default=16)
-    parser.add_argument("--finetune_rate", type=float, default=1.0)
-    
-    args = parser.parse_args()
-    main(args)
+    main()

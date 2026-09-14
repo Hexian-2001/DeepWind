@@ -1,7 +1,13 @@
+import logging
+
 import torch
 from peft import LoraConfig, get_peft_model, TaskType
 
 from src.utils.constants import AttentionAxis
+from src.utils.distributed import is_main_process
+
+logger = logging.getLogger(__name__)
+
 
 def apply_finetune_strategy(model, lora_r=16, lora_alpha=32):
     """
@@ -34,7 +40,11 @@ def apply_finetune_strategy(model, lora_r=16, lora_alpha=32):
         target_modules_list.append(f"backbone.layers.{i}.attention.wQKV")
         target_modules_list.append(f"backbone.layers.{i}.attention.wO")
     
-    print(f"[Adapter] Targeted LoRA modules ({len(target_modules_list)}): {target_modules_list[0]} ...")
+    if is_main_process():
+        logger.info(
+            "[Adapter] Targeted LoRA modules (%d): %s ...",
+            len(target_modules_list), target_modules_list[0],
+        )
 
     # 2. Define PEFT Configuration
     peft_config = LoraConfig(
@@ -59,6 +69,12 @@ def apply_finetune_strategy(model, lora_r=16, lora_alpha=32):
     
     # 4. Verify Parameter Efficiency
     trainable_params, all_params = peft_model.get_nb_trainable_parameters()
-    print(f"[Adapter] Trainable params: {trainable_params:,d} || All params: {all_params:,d} || ratio: {100 * trainable_params / all_params:.2f}%")
-    
+    if is_main_process():
+        logger.info(
+            "[Adapter] Trainable params: %s || All params: %s || ratio: %.2f%%",
+            f"{trainable_params:,d}",
+            f"{all_params:,d}",
+            100 * trainable_params / all_params,
+        )
+
     return peft_model

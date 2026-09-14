@@ -1,0 +1,43 @@
+# configs/finetune.yaml
+# Master config for few-shot LoRA fine-tuning — composes model, data, training.
+
+defaults:
+  - _self_
+  - model: deepwind_small
+  - data: finetune
+  - training: finetune
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+# Global variables
+seed: 42
+project_name: "DeepWind-Research"
+run_name: "finetune"
+
+model_name: "deepwind"            # identifier only; weights come from finetune.pretrained_path
+train_dataset_name: "deepwind_finetune"
+
+results_root: "${oc.env:DEEPWIND_RUNS_ROOT}"
+
+# LoRA fine-tuning strategy (preserves the paper's few-shot adaptation recipe)
+finetune:
+  pretrained_path: "${results_root}/${project_name}/checkpoints/deepwind/deepwind_small"
+  lora_r: 16
+  lora_alpha: 32
+
+wandb:
+  project: ${project_name}
+  name:    ${run_name}
+  id:      ${run_name}
+  tags:    ["finetune"]
+  notes:   ""
+  dir:     "${results_root}/${project_name}/wandb_cache"
+
+hydra:
+  run:
+    dir: "${results_root}/${project_name}/logs/finetune/${run_name}/${now:%Y-%m-%d_%H-%M-%S}"
+  sweep:
+    dir: "${results_root}/${project_name}/logs/finetune/${run_name}/sweeps/${now:%Y-%m-%d_%H-%M-%S}"
+    subdir: ${hydra.job.num}
+  job:
+    chdir: true

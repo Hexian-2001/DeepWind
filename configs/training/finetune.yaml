@@ -1,0 +1,48 @@
+# configs/training/finetune.yaml
+# Fine-tuning training config — preserves the original few-shot recipe:
+#   AdamW lr=1e-4, grad-clip 1.0, cosine schedule, ~30 epochs.
+
+# --- Output ---
+output_dir: "${results_root}/${project_name}/checkpoints/finetune/${run_name}"
+overwrite_output_dir: false
+report_to: "wandb"
+
+# --- Optimization ---
+learning_rate: 1e-4
+weight_decay: 1e-4
+adam_beta1: 0.9
+adam_beta2: 0.999
+max_grad_norm: 1.0
+
+# --- Batch Size & Steps ---
+per_device_train_batch_size: 64
+gradient_accumulation_steps: 1
+num_train_epochs: 30
+lr_scheduler_type: "cosine"
+warmup_ratio: 0.0
+
+# --- Precision ---
+bf16: true
+
+# --- DataLoader ---
+dataloader_num_workers: 4
+dataloader_pin_memory: true
+
+# --- Checkpoint ---
+save_strategy: "epoch"
+save_total_limit: 3
+
+# --- Logging ---
+logging_strategy: "steps"
+logging_steps: 10
+logging_first_step: true
+disable_tqdm: true
+log_on_each_node: false
+
+# --- Evaluation ---
+# Few-shot fine-tuning has no held-out eval split; the last checkpoint is used.
+eval_strategy: "no"
+load_best_model_at_end: false
+
+# --- DDP (required: LoRA modules_to_save may leave gradients unused) ---
+ddp_find_unused_parameters: true

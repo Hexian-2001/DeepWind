@@ -1,0 +1,17 @@
+# configs/data/finetune.yaml
+# Few-shot fine-tuning data config — matches DeepWindFinetuneDataset constructor.
+# Override per site, e.g.:
+#     python finetune.py data.npy_path=/path/to/csg_wind_5.npy run_name=csg_wind_5
+
+# ---- Paths ----
+npy_path: "${oc.env:DEEPWIND_DATA_ROOT}/finetune/site.npy"
+metadata_path: "${oc.env:DEEPWIND_DATA_ROOT}/train_metadata.csv"
+
+# ---- Sequence (context_length is overridden from the loaded checkpoint) ----
+context_length: ${model.context_length}
+max_vars: 6
+pad_val_id: 10
+
+# ---- Few-shot windowing ----
+stride: 16
+finetune_rate: 1.0

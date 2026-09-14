@@ -22,15 +22,22 @@ sys.path.insert(0, PROJECT_ROOT)
 
 import time
 import numpy as np
+import pytest
 import torch
 from torch.utils.data import DataLoader
 from collections import Counter
 
 # ---- Config ----
-TRAIN_NPY_ROOT = "/scratch/pawsey0115/hwang4/deepwindData/train"
-EVAL_NPY_ROOT = "/scratch/pawsey0115/hwang4/deepwindData/eval"
-TRAIN_META = "/scratch/pawsey0115/hwang4/deepwindData/train_metadata.csv"
-EVAL_META = "/scratch/pawsey0115/hwang4/deepwindData/eval_metadata.csv"
+DATA_ROOT = Path(os.environ.get("DEEPWIND_DATA_ROOT", "data/deepwind_corpus_v1"))
+TRAIN_NPY_ROOT = str(DATA_ROOT / "train")
+EVAL_NPY_ROOT = str(DATA_ROOT / "eval")
+TRAIN_META = str(DATA_ROOT / "train_metadata.csv")
+EVAL_META = str(DATA_ROOT / "eval_metadata.csv")
+
+pytestmark = pytest.mark.skipif(
+    not Path(TRAIN_NPY_ROOT).is_dir() or not Path(EVAL_NPY_ROOT).is_dir(),
+    reason="Set DEEPWIND_DATA_ROOT to run corpus integration tests.",
+)
 
 SEQ_LEN = 8192
 MAX_VARS = 6
@@ -46,7 +53,7 @@ def separator(title: str):
 # ==============================================================
 #  Test 1: Train Dataset Init
 # ==============================================================
-def test_train_init():
+def _make_train_dataset():
     separator("Test 1: Train Dataset Init")
     from src.data.datasets import DeepWindTrainDataset
 
@@ -73,13 +80,25 @@ def test_train_init():
     return ds
 
 
+@pytest.fixture(scope="module")
+def train_ds():
+    if not Path(TRAIN_NPY_ROOT).is_dir():
+        pytest.skip("Set DEEPWIND_DATA_ROOT to run corpus integration tests.")
+    return _make_train_dataset()
+
+
+def test_train_init(train_ds):
+    assert len(train_ds.groups) >= 2
+    assert abs(sum(train_ds._probs) - 1.0) < 1e-6
+
+
 # ==============================================================
 #  Test 2: Train Dataset — Sample Shapes & Types
 # ==============================================================
-def test_train_samples(ds):
+def test_train_samples(train_ds):
     separator("Test 2: Train Dataset — Sample Shapes & Types")
 
-    it = iter(ds)
+    it = iter(train_ds)
     for i in range(5):
         sample = next(it)
 
@@ -143,14 +162,14 @@ def test_train_samples(ds):
 # ==============================================================
 #  Test 3: Train Dataset — Group Balance
 # ==============================================================
-def test_train_balance(ds):
+def test_train_balance(train_ds):
     separator("Test 3: Train Dataset — Group Balance (sample-level)")
 
     # Collect 2000 samples, track which group each comes from
     # We detect group by checking variate_ids pattern or coords
     # Simpler: just count samples and time it
 
-    it = iter(ds)
+    it = iter(train_ds)
     n_samples = 2000
 
     t0 = time.time()
@@ -186,11 +205,11 @@ def test_train_balance(ds):
 # ==============================================================
 #  Test 4: Train Dataset — DataLoader Integration
 # ==============================================================
-def test_train_dataloader(ds):
+def test_train_dataloader(train_ds):
     separator("Test 4: Train Dataset — DataLoader (batch=32, workers=2)")
 
     loader = DataLoader(
-        ds,
+        train_ds,
         batch_size=32,
         num_workers=2,
         pin_memory=True,
@@ -229,7 +248,7 @@ def test_train_dataloader(ds):
 # ==============================================================
 #  Test 5: Eval Dataset Init & Shapes
 # ==============================================================
-def test_eval_init():
+def _make_eval_dataset():
     separator("Test 5: Eval Dataset Init & Shapes")
     from src.data.datasets import DeepWindEvalDataset
 
@@ -258,15 +277,27 @@ def test_eval_init():
     return ds
 
 
+@pytest.fixture(scope="module")
+def eval_ds():
+    if not Path(EVAL_NPY_ROOT).is_dir():
+        pytest.skip("Set DEEPWIND_DATA_ROOT to run corpus integration tests.")
+    return _make_eval_dataset()
+
+
+def test_eval_init(eval_ds):
+    assert len(eval_ds) > 0
+    assert eval_ds[0]["context"].shape == (MAX_VARS, SEQ_LEN)
+
+
 # ==============================================================
 #  Test 6: Eval Dataset — Determinism
 # ==============================================================
-def test_eval_determinism(ds):
+def test_eval_determinism(eval_ds):
     separator("Test 6: Eval Dataset — Determinism")
 
     # Read first 10 samples twice, must be identical
-    samples_a = [ds[i] for i in range(10)]
-    samples_b = [ds[i] for i in range(10)]
+    samples_a = [eval_ds[i] for i in range(10)]
+    samples_b = [eval_ds[i] for i in range(10)]
 
     for i in range(10):
         for key in samples_a[i]:
@@ -388,13 +419,13 @@ if __name__ == "__main__":
 
     try:
         # Train tests
-        train_ds = test_train_init()
+        train_ds = _make_train_dataset()
         test_train_samples(train_ds)
         test_train_balance(train_ds)
         test_train_dataloader(train_ds)
 
         # Eval tests
-        eval_ds = test_eval_init()
+        eval_ds = _make_eval_dataset()
         test_eval_determinism(eval_ds)
         test_eval_filter()
         test_eval_dataloader()

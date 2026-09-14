@@ -11,6 +11,7 @@ Shared utilities:
 """
 
 import random
+import hashlib
 import logging
 from pathlib import Path
 from typing import Iterator, Dict, Any, List, Optional, Tuple
@@ -25,6 +26,15 @@ from src.utils.distributed import get_rank_world, is_main_process
 
 
 logger = logging.getLogger(__name__)
+
+
+def _stable_tag_hash(tag: str) -> int:
+    """Deterministic hash of a dataset tag, independent of PYTHONHASHSEED.
+
+    The builtin ``hash(str)`` is salted per-process, which made shard and
+    file seeds unreproducible across runs and processes. MD5 is stable.
+    """
+    return int.from_bytes(hashlib.md5(tag.encode("utf-8")).digest()[:8], "little")
 
 
 # ===================================================================
@@ -393,7 +403,13 @@ class DeepWindTrainDataset(IterableDataset):
             return
 
         num_win = self._num_windows(T)
-        starts = file_rng.integers(0, n_all, size=num_win)
+        # Without-replacement cycles per the paper: sample distinct starts
+        # when possible; only tile with replacement if the series is shorter
+        # than the requested window count.
+        if num_win <= n_all:
+            starts = file_rng.choice(n_all, size=num_win, replace=False)
+        else:
+            starts = file_rng.integers(0, n_all, size=num_win)
         meta = self.meta.get(path.name)
         
         coverage = (num_win * self.seq_len) / T
@@ -448,7 +464,7 @@ class DeepWindTrainDataset(IterableDataset):
                 continue
             group_file_iters[tag] = _ShuffledFileIter(
                 shard,
-                seed=self.seed + gw_id + hash(tag) % 9973,
+                seed=self.seed + gw_id + _stable_tag_hash(tag) % 9973,
             )
             active_tags.append(tag)
 
@@ -475,7 +491,7 @@ class DeepWindTrainDataset(IterableDataset):
                     self.seed
                     + fc * 100003
                     + gw_id * 997
-                    + hash(tag) % 9973
+                    + _stable_tag_hash(tag) % 9973
                 )
                 fc += 1
                 try:
@@ -824,3 +840,78 @@ class DeepWindTestDataset(Dataset):
         sample["index"] = np.array(idx, dtype=np.int64)
 
         return sample
+
+
+# ===================================================================
+#  Few-shot Fine-tuning Dataset
+# ===================================================================
+
+@register_dataset("deepwind_finetune")
+class DeepWindFinetuneDataset(Dataset):
+    """
+    Map-style few-shot fine-tuning dataset for a single site.
+
+    Slides a fixed ``context_length`` window over one .npy file with a given
+    ``stride`` and keeps only a ``finetune_rate`` fraction of the windows to
+    emulate the few-shot regime. Returns the same padded/masked context dict
+    as the pre-training datasets, so the model forward is unchanged.
+    """
+
+    def __init__(
+        self,
+        npy_path: str | Path,
+        metadata_path: str | Path,
+        context_length: int,
+        stride: int = 16,
+        finetune_rate: float = 1.0,
+        max_vars: int = 6,
+        pad_val_id: int = 10,
+    ):
+        super().__init__()
+        self.npy_path = Path(npy_path)
+        self.context_length = context_length
+        self.stride = stride
+        self.max_vars = max_vars
+        self.pad_val_id = pad_val_id
+
+        if not self.npy_path.is_file():
+            raise FileNotFoundError(
+                f"[DeepWindFinetune] File not found: {self.npy_path}"
+            )
+        if not (0.0 < finetune_rate <= 1.0):
+            raise ValueError(
+                f"finetune_rate must be in (0, 1], got {finetune_rate}"
+            )
+
+        self.meta = MetadataStore(metadata_path).get(self.npy_path.name)
+
+        data = np.load(self.npy_path, mmap_mode="r")
+        if data.ndim != 2:
+            raise ValueError(
+                f"[DeepWindFinetune] Expected (C, T), got {data.shape} "
+                f"for {self.npy_path.name}"
+            )
+        self._C, T = data.shape
+        if T < context_length:
+            raise ValueError(
+                f"[DeepWindFinetune] series length {T} < "
+                f"context_length {context_length} ({self.npy_path.name})"
+            )
+
+        # Fixed-stride context starts, subsampled for the few-shot regime.
+        starts = list(range(0, T - context_length + 1, stride))
+        n_keep = max(1, int(len(starts) * finetune_rate))
+        self._starts = starts[:n_keep]
+
+    def __len__(self) -> int:
+        return len(self._starts)
+
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
+        start = self._starts[idx]
+        data = np.load(self.npy_path, mmap_mode="r")
+        window = np.array(
+            data[:, start : start + self.context_length], dtype=np.float32
+        )
+        return _pad_and_mask(
+            window, self.meta, self.max_vars, self.context_length, self.pad_val_id,
+        )

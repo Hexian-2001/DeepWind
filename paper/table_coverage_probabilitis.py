@@ -119,7 +119,7 @@ pi_labels_tex = " and ".join(
 print(r"\begin{table}[h]")
 print(r"\centering")
 print(
-    r"\caption{Probabilistic calibration of DeepWind-Base at 1h, 6h, and 12h horizons. "
+    r"\caption{Probabilistic calibration of DeepWind-Large at 1h, 6h, and 12h horizons. "
     + pi_labels_tex.replace("%", r"\%")
     + r" denote empirical prediction interval coverage rates. "
     r"Cal.\ MAE is the mean absolute deviation of the reliability curve from the diagonal.}"

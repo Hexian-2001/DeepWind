@@ -31,23 +31,6 @@ DISPLAY_ORDER = [
     "penmanshiel_15",
 ]
 
-MOCK_CALIBRATION = True  # ← 改成 True 才生效，False = 完全不影响原来逻辑
-
-MOCK_DATASETS = {
-    "csg_wind_5": {
-        "fix_over":    True,
-        "fix_under":   True,
-        "alpha_over":  0.5,
-        "alpha_under": 0.5,
-    },
-    "gefc12_wind_7": {
-        "fix_over":    True,
-        "fix_under":   True,
-        "alpha_over":  0.25,
-        "alpha_under": 0.1,
-    },
-}
-
 QUANTILE_LEVELS = [
     0.01, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35,
     0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75,
@@ -61,28 +44,6 @@ results_dir = Path(RESULTS_DIR)
 for subdir in sorted(results_dir.iterdir()):
     if subdir.is_dir() and any(subdir.glob("H_*.json")):
         print(repr(subdir.name))
-
-def apply_mock_calibration(coverage: np.ndarray, dataset_name: str) -> np.ndarray:
-    if not MOCK_CALIBRATION:
-        return coverage                      # ← 开关关闭时原样返回，零影响
-    cfg = MOCK_DATASETS.get(dataset_name)
-    if cfg is None:
-        return coverage                      # ← 不在列表里的数据集原样返回
-    nominal  = np.array(QUANTILE_LEVELS)
-    adjusted = coverage.copy()
-    if cfg["fix_over"]:
-        mask = coverage > nominal
-        adjusted[mask] = (
-            cfg["alpha_over"] * nominal[mask]
-            + (1 - cfg["alpha_over"]) * coverage[mask]
-        )
-    if cfg["fix_under"]:
-        mask = coverage < nominal
-        adjusted[mask] = (
-            cfg["alpha_under"] * nominal[mask]
-            + (1 - cfg["alpha_under"]) * coverage[mask]
-        )
-    return adjusted
 
 def discover_datasets(results_dir: Path) -> list[tuple[Path, str]]:
     # Collect all valid dataset dirs
@@ -119,7 +80,6 @@ def load_coverage(dataset_dir: Path) -> np.ndarray | None:
     if not rows:
         return None
     coverage = np.mean(rows, axis=0)
-    coverage = apply_mock_calibration(coverage, dataset_dir.name)  # ← 唯一改动
     return coverage
 
 
@@ -218,7 +178,7 @@ legend_elements = [
     plt.Line2D([0], [0], linestyle="--", color="gray", linewidth=1.2,
                label="Perfect calibration"),
     plt.Line2D([0], [0], linestyle="-", color="#3266ad", linewidth=2,
-               label="DeepWind-Base"),
+               label="DeepWind-Large"),
     mpatches.Patch(facecolor="#3266ad", alpha=0.2, label="Over-coverage"),
     mpatches.Patch(facecolor="#d85a30", alpha=0.2, label="Under-coverage"),
 ]
@@ -226,7 +186,7 @@ fig.legend(handles=legend_elements, loc="lower center", ncol=4,
            fontsize=8, frameon=False, bbox_to_anchor=(0.5, -0.02))
 
 fig.suptitle(
-    "Reliability diagrams of DeepWind-Base across WindBench datasets\n"
+    "Reliability diagrams of DeepWind-Large across WindBench datasets\n"
     "(averaged over 1,2,4,6,8,12 forecasting hours)",
     fontsize=10, y=1.01,
 )

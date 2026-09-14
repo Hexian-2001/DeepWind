@@ -57,8 +57,9 @@ class DistributedEvaluator:
 
     @torch.no_grad()
     def run(self, dataloader, dataset_len, pred_len):
-        local    = self._run_local_inference(dataloader, pred_len)
-        gathered = self._gather(local)
+        local        = self._run_local_inference(dataloader, pred_len)
+        num_quantiles = len(self.cfg.model.quantiles)
+        gathered     = self._gather(local, pred_len, num_quantiles)
 
         if not is_main_process():
             return {}
@@ -118,20 +119,22 @@ class DistributedEvaluator:
 
     # ── Private: gather & trim ─────────────────────────────────────────────────
 
-    def _gather(self, local):
-        def safe_cat(lst):
-            # Return a zero-size tensor if the list is empty,
-            # so all_gather still gets a valid (0-row) tensor to work with
+    def _gather(self, local, pred_len, num_quantiles):
+        def safe_cat(lst, empty_shape, dtype=torch.float32):
+            # Return a correctly-shaped zero-size tensor if the list is empty,
+            # so all_gather still gets a valid (0-row) tensor to work with.
+            # The trailing dims must match non-empty ranks or the padded
+            # all_gather in `gather_and_merge` raises a shape mismatch.
             if len(lst) == 0:
-                return torch.zeros(0, dtype=torch.float32)
+                return torch.zeros(empty_shape, dtype=dtype)
             return torch.cat(lst, dim=0)
-    
+
         return {
-            "point_preds":    gather_and_merge(safe_cat(local["point_preds"]),    self.device),
-            "quantile_preds": gather_and_merge(safe_cat(local["quantile_preds"]), self.device),
-            "targets":        gather_and_merge(safe_cat(local["targets"]),        self.device),
-            "history":        gather_and_merge(safe_cat(local["history"]),        self.device),
-            "indices":        gather_and_merge(safe_cat(local["indices"]),        self.device),
+            "point_preds":    gather_and_merge(safe_cat(local["point_preds"], (0, pred_len)), self.device),
+            "quantile_preds": gather_and_merge(safe_cat(local["quantile_preds"], (0, pred_len, num_quantiles)), self.device),
+            "targets":        gather_and_merge(safe_cat(local["targets"], (0, pred_len)), self.device),
+            "history":        gather_and_merge(safe_cat(local["history"], (0, pred_len)), self.device),
+            "indices":        gather_and_merge(safe_cat(local["indices"], (0,), dtype=torch.long), self.device),
         }
 
     @staticmethod

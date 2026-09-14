@@ -64,5 +64,5 @@ dense_act_fn: "silu"
 use_arcsinh: true
 
 # --- Distribution Head ---
-pred_head_type: "student_t"   # "quantile" | "student_t" | "zi_beta" | "gmm"
+pred_head_type: "quantile"   # "quantile" | "student_t" | "zi_beta" | "gmm"
 gmm_components: 3             # only used when pred_head_type="gmm"

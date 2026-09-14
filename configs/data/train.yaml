@@ -12,8 +12,8 @@ pad_val_id: 10
 
 # ---- Dataset-level balanced sampling ----
 dataset_weights:
-  windtoolkit: 0.9
-  scada: 0.1
+  windtoolkit: 0.7
+  scada: 0.3
 
 # ---- Adaptive windowing ----
 sample_ratio: 0.005

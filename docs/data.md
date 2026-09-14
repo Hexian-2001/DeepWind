@@ -11,9 +11,11 @@ $DEEPWIND_DATA_ROOT/
 └── eval_metadata.csv
 ```
 
-Each array has shape `(time, variate)`. Metadata maps each file to its dataset,
-available variates, capacity, coordinates, and normalization information. The
-loader pads heterogeneous inputs to `max_vars` and supplies a channel mask.
+Each array is `float32` with shape `(variate, time)`. Metadata columns are
+`filename`, `latitude`, `longitude`, `variate_ids`, and `dataset`. The loader
+pads heterogeneous inputs to `max_vars` and supplies a channel mask. Instance
+normalisation is computed online from each sampled context window; capacity is
+kept in the evaluation metadata/constants rather than this training CSV.
 
 ## Corpus and sampling
 

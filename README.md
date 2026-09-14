@@ -75,7 +75,7 @@ python train.py \
   model.pred_head_type=quantile
 
 python evaluate.py \
-  model_name=/path/to/checkpoint \
+  inference.checkpoint_path=/path/to/checkpoint \
   run_name=my-evaluation
 ```
 

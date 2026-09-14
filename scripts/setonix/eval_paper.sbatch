@@ -21,6 +21,10 @@
 set -euo pipefail
 
 MODEL="${MODEL:-small}"          # small | base | large
+case "${MODEL}" in
+  small|base|large) ;;
+  *) echo "ERROR: MODEL must be small|base|large (got '${MODEL}')" >&2; exit 2 ;;
+esac
 CKPT="${CKPT:?CKPT (checkpoint dir) required}"
 EVAL_NAME="${EVAL_NAME:-eval-${MODEL}-paper-seed42}"
 

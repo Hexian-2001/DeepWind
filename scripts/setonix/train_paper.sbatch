@@ -34,6 +34,10 @@
 set -euo pipefail
 
 MODEL="${MODEL:-base}"   # small | base | large
+case "${MODEL}" in
+  small|base|large) ;;
+  *) echo "ERROR: MODEL must be small|base|large (got '${MODEL}')" >&2; exit 2 ;;
+esac
 
 # --- Paths (self-contained; DEEPWIND_* are NOT in ~/.bashrc) ---------------
 export DEEPWIND_PROJECT_ROOT="${DEEPWIND_PROJECT_ROOT:-/software/projects/pawsey0115/hwang4/research_projects/DeepWind}"

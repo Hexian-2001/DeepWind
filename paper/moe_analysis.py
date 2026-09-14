@@ -53,14 +53,13 @@ REGIME_SHADE  = ["#AEC6E8", "#FFE5B4", "#B5EAD7"]
 TARGET_DATASETS = {
     "csg_wind_5":      35.0,
     "gefc12_wind_7":    1.0,
-    "penmanshiel_13": 2080.0,
+    "penmanshiel_15": 2080.0,
     "wtk_76016":        4.0,
 }
 
 # Filename mapping for datasets whose on-disk name differs from the dict key
 FILENAME_MAP = {
     "wtk_76016":      "76016.npy",
-    "penmanshiel_13": "penmanshiel_15.npy",  
 }
 # Cap total windows per dataset to keep inference time manageable
 TARGET_MAX_WINDOWS = 500

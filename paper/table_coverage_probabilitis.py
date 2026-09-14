@@ -11,7 +11,7 @@ DISPLAY_NAMES = {
     "76016":      "WTK-76016",
     "43458":      "WTK-43458",
     "csg_wind_5":     "CSG-Wind-5",
-    "penmanshiel_13": "Penmanshiel-13",
+    "penmanshiel_15": "Penmanshiel-13",
     "gefc12_wind_7":  "GEFC12-7",
     "gefc14_wind_10": "GEFC14-10",
 }

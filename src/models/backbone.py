@@ -143,21 +143,32 @@ class DeepWindBackbone(nn.Module):
             if self.gradient_checkpointing and self.training:
                 def create_custom_forward(module):
                     def custom_forward(*args):
-                        # Wrapper to unpack and return only hidden_state for grad checkpointing compatibility
-                        return module(*args).hidden_state
+                        # Return hidden_state and the MoE aux loss together so
+                        # gradient checkpointing does not silently drop the
+                        # load-balancing term. None is replaced by a zero so the
+                        # returned tuple stays tensor-valued for autograd.
+                        out = module(*args)
+                        aux = out.aux_loss
+                        if aux is None:
+                            aux = torch.zeros(
+                                (), device=out.hidden_state.device,
+                                dtype=out.hidden_state.dtype,
+                            )
+                        return out.hidden_state, aux
                     return custom_forward
 
-                # Note: Gradient Checkpointing usually breaks Aux Loss return. 
-                # If you need Aux Loss + Checkpointing, you need a more complex wrapper.
-                # Here we simplify for standard usage.
-                hidden_states = torch.utils.checkpoint.checkpoint(
+                hidden_states, layer_aux_loss = torch.utils.checkpoint.checkpoint(
                     create_custom_forward(layer),
-                    i, 
-                    hidden_states, 
+                    i,
+                    hidden_states,
                     current_mask,
                     kv_cache,
-                    output_attentions
+                    output_attentions,
+                    use_reentrant=False,
                 )
+                if total_aux_loss is not None:
+                    total_aux_loss = total_aux_loss + layer_aux_loss
+                    num_layers_with_loss += 1
             else:
                 # Standard Forward
                 layer_output: DeepWindLayerOutput = layer(

@@ -3,27 +3,16 @@
 test_dataset_name: "deepwind_test"
 
 data:
-  # Path configuration (Use absolute paths or env vars in production)
   test_npy_paths:
-    #- "/scratch/pawsey0115/hwang4/deepwindData/test_datasets_ICL/30651.npy"
-    #- "/scratch/pawsey0115/hwang4/deepwindData/test_datasets_ICL/43458.npy"
-    #- "/scratch/pawsey0115/hwang4/deepwindData/test_datasets_ICL/75354.npy"
-    #- "/scratch/pawsey0115/hwang4/deepwindData/test_datasets_ICL/76016.npy"
-    #- "/scratch/pawsey0115/hwang4/deepwindData/test_datasets_ICL/csg_wind_5.npy"
-    #- "/scratch/pawsey0115/hwang4/deepwindData/test_datasets_ICL/gefc12_wind_7.npy"
-    #- "/scratch/pawsey0115/hwang4/deepwindData/test_datasets_ICL/gefc14_wind_10.npy"
-    #- "/scratch/pawsey0115/hwang4/deepwindData/test_datasets_ICL/penmanshiel_15.npy"
-    - "/scratch/pawsey0115/hwang4/deepwindData/test/30651.npy"
-    - "/scratch/pawsey0115/hwang4/deepwindData/test/43458.npy"
-    - "/scratch/pawsey0115/hwang4/deepwindData/test/75354.npy"
-    # - "/scratch/pawsey0115/hwang4/deepwindData/test/76016.npy"
-    - "/scratch/pawsey0115/hwang4/deepwindData/test/csg_wind_5.npy"
-    - "/scratch/pawsey0115/hwang4/deepwindData/test/gefc12_wind_7.npy"
-    - "/scratch/pawsey0115/hwang4/deepwindData/test/gefc14_wind_10.npy"
-    - "/scratch/pawsey0115/hwang4/deepwindData/test/penmanshiel_15.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/30651.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/43458.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/75354.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/csg_wind_5.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/gefc12_wind_7.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/gefc14_wind_10.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/penmanshiel_15.npy"
 
-  #metadata_path: "/scratch/pawsey0115/hwang4/deepwindData/test_datasets_ICL/test_metadata.csv"
-  metadata_path: "/scratch/pawsey0115/hwang4/deepwindData/train_metadata.csv"
+  metadata_path: "${oc.env:DEEPWIND_DATA_ROOT}/train_metadata.csv"
 
   # Dataset specifics
   context_length: 8192

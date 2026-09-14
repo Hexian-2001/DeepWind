@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import atexit
 import logging
 import os
 
@@ -18,7 +19,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from src.data.datasets import *  
 from src.models.configuration import *  
 from src.models.deepwind import *  
-from src.utils.distributed import is_main_process
+from src.utils.distributed import cleanup_ddp, is_main_process
 from src.utils.registry import CONFIG_REGISTRY, DATASET_REGISTRY, MODEL_REGISTRY
 from src.utils.trainer import DeepWindTrainer
 
@@ -172,6 +173,9 @@ def _build_eval_dataset(cfg: DictConfig):
 
 @hydra.main(version_base=None, config_path="configs", config_name="train")
 def main(cfg: DictConfig) -> None:
+    # Hugging Face initialises the process group lazily. Register cleanup before
+    # any later failure so normal and exceptional exits both release RCCL state.
+    atexit.register(cleanup_ddp)
     OmegaConf.resolve(cfg)
 
     # ── Silence all wandb output on non-main processes before any import

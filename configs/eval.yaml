@@ -6,23 +6,19 @@ defaults:
 
 run_name: "deepwind_small_fix_sharding_v2"
 model_name: "deepwind_small_fix_sharding_v2"
-base_dir: "/scratch/pawsey0115/hwang4/results/DeepWind-Research"
+base_dir: "${oc.env:DEEPWIND_RUNS_ROOT}"
 
 seed: 42
 
 data:
-  metadata_path: "/scratch/pawsey0115/hwang4/deepwindData/train_metadata.csv"
+  metadata_path: "${oc.env:DEEPWIND_DATA_ROOT}/train_metadata.csv"
   context_length: 8192
   stride: null
   test_npy_paths:
-    # - "/scratch/pawsey0115/hwang4/deepwindData/test/csg_wind_5.npy"
-    #- "/scratch/pawsey0115/hwang4/deepwindData/test/gefc12_wind_7.npy"
-    #- "/scratch/pawsey0115/hwang4/deepwindData/test/gefc14_wind_10.npy"
-    #- "/scratch/pawsey0115/hwang4/deepwindData/test/penmanshiel_15.npy"
-    - "/scratch/pawsey0115/hwang4/deepwindData/test/75354.npy"
-    - "/scratch/pawsey0115/hwang4/deepwindData/test/30651.npy"
-    - "/scratch/pawsey0115/hwang4/deepwindData/test/76016.npy"
-    - "/scratch/pawsey0115/hwang4/deepwindData/test/43458.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/75354.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/30651.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/76016.npy"
+    - "${oc.env:DEEPWIND_DATA_ROOT}/test/43458.npy"
 
 inference:
   batch_size: 4

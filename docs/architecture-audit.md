@@ -57,3 +57,5 @@ receive a new experiment name.
 3. Pass unit, one-GPU, multi-GPU, and two-node smoke tests.
 4. Verify resume equivalence and WandB artifact persistence.
 5. Run a fixed-seed Small-model baseline before committing to Large.
+
+The two-node, four-process DDP gate passed on Setonix as Slurm job `48776871`.

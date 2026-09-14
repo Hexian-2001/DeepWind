@@ -20,6 +20,7 @@ from src.data.datasets import *
 from src.models.configuration import *  
 from src.models.deepwind import *  
 from src.utils.distributed import cleanup_ddp, is_main_process
+from src.utils.provenance import write_run_info
 from src.utils.registry import CONFIG_REGISTRY, DATASET_REGISTRY, MODEL_REGISTRY
 from src.utils.trainer import DeepWindTrainer
 
@@ -197,6 +198,10 @@ def main(cfg: DictConfig) -> None:
         **OmegaConf.to_container(cfg.training, resolve=True)
     )
     last_checkpoint = _detect_checkpoint(training_args.output_dir, training_args)
+
+    # 2b. Provenance manifest (rank-0 only; written before any training state)
+    if is_main_process():
+        write_run_info(training_args.output_dir, cfg)
 
     # 3. wandb (rank-0 only; other ranks are already disabled via env var)
     if is_main_process() and training_args.report_to and "wandb" in training_args.report_to:

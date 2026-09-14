@@ -90,11 +90,12 @@ configs (`${oc.env:...}`) and analysis scripts (`os.environ.get(...)`).
 
 ## Phase 6 — Provenance & experiment standards (point 5)
 
-- [ ] Add `src/utils/provenance.py`: writes `metadata/run_info.json` per run
+- [x] Add `src/utils/provenance.py`: writes `run_info.json` per run
       (git commit, dirty-tree flag, resolved Hydra config, `pip freeze`,
       filtered env snapshot).
-- [ ] Wire it into `train.py` / `finetune.py` / `evaluate.py`.
-- [ ] Adopt a run-name convention: `deepwind-{size}-{variant}-{seed}-{date}`.
+- [x] Wire it into `train.py` / `finetune.py` / `evaluate.py`.
+- [x] Adopt a run-name convention: `deepwind-{size}-{variant}-{seed}-{date}`
+      (exposed as `provenance.make_run_name`).
 
 ## Phase 7 — Data hygiene (points 3, 6)
 

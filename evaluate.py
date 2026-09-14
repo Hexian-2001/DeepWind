@@ -28,6 +28,7 @@ from src.utils.distributed import (
     is_main_process,
     setup_ddp,
 )
+from src.utils.provenance import write_run_info
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,10 @@ def main(cfg: DictConfig) -> None:
             f"context_len={cfg.data.context_length}, "
             f"horizons={cfg.inference.horizon_h}h"
         )
+
+    # ── Provenance manifest (rank-0 only; written before evaluation runs) ─────
+    if is_main_process():
+        write_run_info(cfg.output.output_dir, cfg)
 
     # ── Build pipeline (one per rank, on its own device) ──────────────────────
     pipeline = InferencePipeline(

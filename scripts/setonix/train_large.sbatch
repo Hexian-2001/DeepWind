@@ -60,7 +60,7 @@ command="${DEEPWIND_VENV}/bin/python -m torch.distributed.run \
   ${DEEPWIND_PROJECT_ROOT}/train.py \
   run_name=${run_name} model=deepwind_large data=train data_eval=eval training=deepwind_large \
   model.num_experts=8 model.pred_head_type=quantile \
-  model.use_rotary_emb=false model.use_xpos=true model.aux_loss_weight=0.01 \
+  model.use_rotary_emb=true model.use_xpos=true model.aux_loss_weight=0.02 \
   training.learning_rate=1e-4 training.per_device_train_batch_size=4 \
   training.gradient_accumulation_steps=4 training.max_steps=100000 \
   training.output_dir=${run_dir}/checkpoints"

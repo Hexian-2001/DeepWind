@@ -71,7 +71,7 @@ class InstanceNorm(nn.Module):
             var = torch.nanmean((x - loc) ** 2, dim=-1, keepdim=True)
             scale = torch.sqrt(var)
 
-            # handle NaN 和 0：NaN -> (loc=0, scale=1)，并确保 scale >= eps
+            # handle NaN and 0: NaN -> (loc=0, scale=1); clamp scale >= eps
             loc = torch.nan_to_num(loc, nan=0.0)
             scale = torch.nan_to_num(scale, nan=1.0)
             scale = scale.clamp_min(self.eps)

@@ -25,6 +25,7 @@ import argparse
 import csv
 import json
 import logging
+import os
 import sys
 import time
 from pathlib import Path
@@ -483,11 +484,27 @@ if __name__ == "__main__":
     )
 
     parser = argparse.ArgumentParser()
+
+    # Resolve paths from environment variables with legacy defaults so the
+    # script stays portable and no machine-specific path is hardcoded.
+    results_root = os.environ.get(
+        "DEEPWIND_RESULTS_ROOT",
+        "/scratch/pawsey0115/hwang4/results/DeepWind-Research",
+    )
+    experiments_root = os.environ.get(
+        "DEEPWIND_EXPERIMENTS_ROOT",
+        "/scratch/pawsey0115/hwang4/deepwind_experiments",
+    )
+    project_root = os.environ.get(
+        "DEEPWIND_PROJECT_ROOT",
+        "/software/projects/pawsey0115/hwang4/research_projects/DeepWind",
+    )
+
     # Checkpoint paths
-    parser.add_argument("--small_ckpt",  default="/scratch/pawsey0115/hwang4/results/DeepWind-Research/checkpoints/deepwind/deepwind_small_scada_1_wtk_9", help="Path to DeepWind-Small checkpoint")
-    parser.add_argument("--base_ckpt",   default="/scratch/pawsey0115/hwang4/deepwind_experiments/checkpoints/deepwind_base_v1", help="Path to DeepWind-Base checkpoint")
-    parser.add_argument("--large_ckpt",  default="/scratch/pawsey0115/hwang4/results/DeepWind-Research/checkpoints/deepwind/deepwind_large_v5", help="Path to DeepWind-Large checkpoint")
-    parser.add_argument("--config_path", default="/scratch/pawsey0115/hwang4/project_codes/deepwind_research/configs/eval.yaml")
+    parser.add_argument("--small_ckpt",  default=os.path.join(results_root, "checkpoints/deepwind/deepwind_small_scada_1_wtk_9"), help="Path to DeepWind-Small checkpoint")
+    parser.add_argument("--base_ckpt",   default=os.path.join(experiments_root, "checkpoints/deepwind_base_v1"), help="Path to DeepWind-Base checkpoint")
+    parser.add_argument("--large_ckpt",  default=os.path.join(results_root, "checkpoints/deepwind/deepwind_large_v5"), help="Path to DeepWind-Large checkpoint")
+    parser.add_argument("--config_path", default=os.path.join(project_root, "configs/eval.yaml"))
     parser.add_argument("--output_dir",  default="./paper/efficiency_outputs")
     # Benchmark settings
     parser.add_argument("--horizons",    type=int, nargs="+",

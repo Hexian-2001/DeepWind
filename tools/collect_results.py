@@ -4,8 +4,8 @@ Scan all H_*.json under a results root and aggregate into a single CSV/Excel.
 
 Usage:
     python tools/collect_results.py \
-        --results_root /scratch/pawsey0115/hwang4/results \
-        --output       /scratch/pawsey0115/hwang4/results/summary/compare_all.csv
+        --results_root "$DEEPWIND_RESULTS_ROOT" \
+        --output       "$DEEPWIND_RESULTS_ROOT/summary/compare_all.csv"
 """
 import argparse
 import json

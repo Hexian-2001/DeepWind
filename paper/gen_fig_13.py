@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -193,7 +194,7 @@ def plot_single_figure13(
     ax_p.legend(
         fontsize   = 8,
         loc        = "lower right",
-        bbox_to_anchor = (1.0, 1.01),  # 紧贴ax_p顶边外侧
+        bbox_to_anchor = (1.0, 1.01),  # flush against the top edge of ax_p
         ncol       = 4,
         framealpha = 0.85,
         borderaxespad = 0,
@@ -462,10 +463,23 @@ if __name__ == "__main__":
                         datefmt="%H:%M:%S")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint_path",   default="/scratch/pawsey0115/hwang4/results/DeepWind-Research/checkpoints/deepwind/deepwind_large_v5")
-    parser.add_argument("--config_path",       default="/scratch/pawsey0115/hwang4/project_codes/deepwind_research/configs/eval.yaml")
-    parser.add_argument("--npy_root",          default="/scratch/pawsey0115/hwang4/deepwindData/test")
-    parser.add_argument("--metadata_path",     default="/scratch/pawsey0115/hwang4/deepwindData/train_metadata.csv")
+
+    results_root = os.environ.get(
+        "DEEPWIND_RESULTS_ROOT",
+        "/scratch/pawsey0115/hwang4/results/DeepWind-Research",
+    )
+    data_root = os.environ.get(
+        "DEEPWIND_DATA_ROOT", "/scratch/pawsey0115/hwang4/deepwindData"
+    )
+    project_root = os.environ.get(
+        "DEEPWIND_PROJECT_ROOT",
+        "/software/projects/pawsey0115/hwang4/research_projects/DeepWind",
+    )
+
+    parser.add_argument("--checkpoint_path",   default=os.path.join(results_root, "checkpoints/deepwind/deepwind_large_v5"))
+    parser.add_argument("--config_path",       default=os.path.join(project_root, "configs/eval.yaml"))
+    parser.add_argument("--npy_root",          default=os.path.join(data_root, "test"))
+    parser.add_argument("--metadata_path",     default=os.path.join(data_root, "train_metadata.csv"))
     parser.add_argument("--output_dir",        default="./paper/fig13_outputs")
     parser.add_argument("--batch_size",        type=int,   default=4)
     parser.add_argument("--context_length",    type=int,   default=1024)

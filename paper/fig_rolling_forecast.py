@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -5,7 +7,12 @@ from pathlib import Path
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 MODEL_NAME = "deepwind_large_v5"
-RESULTS_DIR = Path("/scratch/pawsey0115/hwang4/results/DeepWind-Research/results/deepwind/deepwind_large_v5/raw_results")
+RESULTS_DIR = Path(
+    os.environ.get(
+        "DEEPWIND_RESULTS_ROOT",
+        "/scratch/pawsey0115/hwang4/results/DeepWind-Research",
+    )
+) / "results/deepwind/deepwind_large_v5/raw_results"
 
 DISPLAY_NAMES = {
    # "csg_wind_5":   "CSG-Wind-5",

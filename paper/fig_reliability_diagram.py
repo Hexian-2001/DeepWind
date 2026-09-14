@@ -1,4 +1,6 @@
 import json
+import os
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -6,7 +8,13 @@ from pathlib import Path
 import math
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-RESULTS_DIR = "/scratch/pawsey0115/hwang4/results/DeepWind-Research/results/deepwind/deepwind_large_v5"
+RESULTS_DIR = os.path.join(
+    os.environ.get(
+        "DEEPWIND_RESULTS_ROOT",
+        "/scratch/pawsey0115/hwang4/results/DeepWind-Research",
+    ),
+    "results/deepwind/deepwind_large_v5",
+)
 
 # Display name mapping: folder name → paper label
 DISPLAY_NAMES = {

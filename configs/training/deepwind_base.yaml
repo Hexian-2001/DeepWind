@@ -1,9 +1,9 @@
-# configs/training/train_small.yaml
-# Training config for DeepWind-Small (~30M)
-# Expected: 4 nodes × 8 GPUs (32 GPUs), effective_batch = 32 × 2 × 32 = 2048
+# configs/training/deepwind_base.yaml
+# Training config for DeepWind-Base
+# Expected: 4 nodes × 8 GPUs (32 GPUs), effective_batch = 16 × 4 × 32 = 2048
 
 # --- Output ---
-output_dir: "${results_root}/${project_name}/checkpoints/${run_name}"
+output_dir: "${results_root}/${project_name}/checkpoints/${model_name}/${run_name}"
 overwrite_output_dir: false
 run_name: ${run_name}
 report_to: "wandb"

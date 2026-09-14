@@ -1,10 +1,21 @@
 # tools/plot_rolling.py
+import os
+
 import numpy as np
 from omegaconf import OmegaConf
 from src.evaluation.reporter import EvaluationReporter
 
-NPZ_PATH = "/scratch/pawsey0115/hwang4/results/DeepWind-Research/results/deepwind/deepwind_patch_16_no_stats/raw_results/csg_wind_5/raw_H12.npz"
-OUTPUT_DIR = "/scratch/pawsey0115/hwang4/results/DeepWind-Research/results/deepwind/deepwind_patch_16_no_stats"
+RESULTS_ROOT = os.environ.get(
+    "DEEPWIND_RESULTS_ROOT",
+    "/scratch/pawsey0115/hwang4/results/DeepWind-Research",
+)
+NPZ_PATH = os.path.join(
+    RESULTS_ROOT,
+    "results/deepwind/deepwind_patch_16_no_stats/raw_results/csg_wind_5/raw_H12.npz",
+)
+OUTPUT_DIR = os.path.join(
+    RESULTS_ROOT, "results/deepwind/deepwind_patch_16_no_stats"
+)
 
 cfg = OmegaConf.create({
     "output": {

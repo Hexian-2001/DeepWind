@@ -417,7 +417,7 @@ class ForecastingEvaluator:
                 y_true, y_pred, capacity, threshold=qualified_rate_threshold
             ),
             "MAE_Coverage":   self.calc_mae_coverage(y_true, y_quantiles),
-            "R2":             self.calc_r2(y_true, y_pred),           # 新增
+            "R2":             self.calc_r2(y_true, y_pred),
         }
 
         # Per-quantile coverage

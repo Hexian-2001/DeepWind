@@ -1,4 +1,4 @@
-# configs/training/train_small.yaml
+# configs/training/deepwind_small.yaml
 # Training config for DeepWind-Small (~30M)
 # Expected: 4 nodes × 8 GPUs (32 GPUs), effective_batch = 32 × 2 × 32 = 2048
 

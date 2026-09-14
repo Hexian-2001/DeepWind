@@ -105,7 +105,7 @@ class StudentTHead(nn.Module):
 
         mu    = mu_raw
         sigma = F.softplus(sigma_raw) + 1e-4
-        nu    = F.softplus(nu_raw)    + 2.0   # ν > 2 保证方差有限
+        nu    = F.softplus(nu_raw)    + 2.0   # ν > 2 ensures finite variance
 
         return torch.stack([mu, sigma, nu], dim=-1)           # (B, V, L, P, 3)
 

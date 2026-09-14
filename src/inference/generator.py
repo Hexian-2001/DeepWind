@@ -159,8 +159,8 @@ class DistributionSampler:
         nu    = params[..., 2].cpu().numpy()
 
         loc, scale = loc_scale
-        loc   = loc.cpu().numpy()    # (B, V, 1) — 不 squeeze
-        scale = scale.cpu().numpy()  # (B, V, 1) — 不 squeeze
+        loc   = loc.cpu().numpy()    # (B, V, 1) — do not squeeze
+        scale = scale.cpu().numpy()  # (B, V, 1) — do not squeeze
 
         q = self.inference_quantiles                           # (Q,)
         t_ppf  = scipy_t.ppf(q, df=nu[..., np.newaxis])       # (B, V, T, Q)

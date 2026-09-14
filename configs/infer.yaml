@@ -1,0 +1,37 @@
+# configs/infer.yaml
+# User-facing single-site inference config — matches infer.py.
+
+defaults:
+  - _self_
+  - model: deepwind_small
+
+run_name: "infer"
+results_root: "${oc.env:DEEPWIND_RUNS_ROOT}"
+
+data:
+  npy_path: "${oc.env:DEEPWIND_DATA_ROOT}/test/30651.npy"
+  metadata_path: "${oc.env:DEEPWIND_DATA_ROOT}/train_metadata.csv"
+  context_length: ${model.context_length}
+  max_vars: 6
+  pad_val_id: 10
+
+inference:
+  checkpoint_path: "${results_root}/DeepWind-Research/checkpoints/deepwind/deepwind_small"
+  adapter_path: null
+  prediction_length: 96      # forecast length in time steps
+  use_amp: true
+  mqd_infer: false
+  # inference_quantiles is intentionally omitted: the forecaster falls back to
+  # the checkpoint's training quantiles (quantile head) or the ventile grid
+  # (distribution head), keeping the output Q axis consistent.
+
+output:
+  output_path: "./forecast.npz"
+  save_npz: true
+  save_json: true
+
+hydra:
+  run:
+    dir: "${results_root}/logs/infer/${now:%Y-%m-%d_%H-%M-%S}"
+  job:
+    chdir: false

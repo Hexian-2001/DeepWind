@@ -1,6 +1,8 @@
 import torch
 from peft import LoraConfig, get_peft_model, TaskType
 
+from src.utils.constants import AttentionAxis
+
 def apply_finetune_strategy(model, lora_r=16, lora_alpha=32):
     """
     Applies the 'Decoupled Variate-Expert Adaptation' strategy with Head tuning.
@@ -15,10 +17,17 @@ def apply_finetune_strategy(model, lora_r=16, lora_alpha=32):
     """
     
     # 1. Dynamic Target Selection
-    # We only want to target odd layers (Variate-Attention).
-    # Based on your structure: backbone.layers.1, .3, .5 ... .11
+    # Derive targets from the instantiated model. This works for every model
+    # depth and for non-default attention schedules.
     target_modules_list = []
-    variate_layer_indices = [1, 3, 5, 7, 9, 11]
+    variate_layer_indices = [
+        i
+        for i, layer in enumerate(model.backbone.layers)
+        if layer.attention_axis == AttentionAxis.VARIATE
+    ]
+
+    if not variate_layer_indices:
+        raise ValueError("LoRA strategy requires at least one variate-attention layer.")
     
     for i in variate_layer_indices:
         # Targeting the QKV projection and Output projection in Variate Attention

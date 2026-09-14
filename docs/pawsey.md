@@ -21,3 +21,19 @@ allocation.
 For each production launch, record `module list`, `$SINGULARITY_CONTAINER`,
 `git rev-parse HEAD`, `git status --porcelain`, `pip freeze`, and Slurm metadata
 inside the run directory.
+
+## Two-node Large training
+
+The production launcher defaults to WandB offline mode so every run survives
+an external-service outage. Use online mode only after authenticating outside
+the repository.
+
+```bash
+export DEEPWIND_RUN_NAME=large-checkpoint-replication-v1
+export WANDB_MODE=offline
+sbatch --export=ALL scripts/setonix/train_large.sbatch
+```
+
+The launcher records the commit, dirty-tree patch, resolved command, loaded
+modules, Python packages, and a secret-filtered environment snapshot under the
+run's `metadata/` directory.

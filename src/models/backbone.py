@@ -57,14 +57,14 @@ class DeepWindBackbone(nn.Module):
         if config.use_rotary_emb:
             self.rotary_emb = TimeAwareRotaryEmbedding(
                 dim=config.d_model // config.num_heads,
-                use_xpos=True,                        
+                use_xpos=config.use_xpos,
                 cache_if_possible=True
-            ) # config.use_xpos,
+            )
 
         # 3. Layer Strategy (Time vs Space)
         attention_axes = generate_attention_axes(
             num_layers=config.num_layers,
-            every_n=config.variate_atten_every_n_layers,
+            every_n=(config.variate_atten_every_n_layers if config.use_variate_atten else -1),
             variate_first=config.variate_atten_first
         )
 
@@ -197,4 +197,3 @@ class DeepWindBackbone(nn.Module):
             all_ffn_details=all_ffn_details, 
             aux_loss=total_aux_loss
         )
-    

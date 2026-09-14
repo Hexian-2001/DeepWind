@@ -23,7 +23,7 @@ def main() -> None:
 
     model = DeepWindModel.from_pretrained(
         args.checkpoint,
-        torch_dtype=torch.bfloat16 if args.device.startswith("cuda") else torch.float32,
+        dtype=torch.bfloat16 if args.device.startswith("cuda") else torch.float32,
     ).to(args.device)
     model.eval()
 
@@ -39,7 +39,11 @@ def main() -> None:
     def tensor(key: str) -> torch.Tensor:
         return torch.from_numpy(sample[key]).unsqueeze(0).to(args.device)
 
-    with torch.inference_mode():
+    with torch.inference_mode(), torch.autocast(
+        device_type=torch.device(args.device).type,
+        dtype=torch.bfloat16,
+        enabled=args.device.startswith("cuda"),
+    ):
         output = model(
             context=tensor("context"),
             site_coords=tensor("site_coords"),

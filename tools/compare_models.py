@@ -3,6 +3,8 @@
 """Compare registered DeepWind models from the leaderboard.
 
 Usage:
+    python tools/compare_models.py --summary                    # quick ranking by nCRPS
+    python tools/compare_models.py --summary --variant small,base,large
     python tools/compare_models.py --all
     python tools/compare_models.py --variant small,base,large
     python tools/compare_models.py deepwind-small-paper-seed42 deepwind-base-paper-seed42
@@ -103,6 +105,36 @@ def _group_by_family(rows):
     return list(fams.values())
 
 
+def _summary_view(rows):
+    """Compact one-line-per-model ranking sorted by nCRPS (primary metric)."""
+    def _ncrps(r):
+        v = r.get("metrics", {}).get("mean", {}).get("nCRPS")
+        return v if _finite(v) else float("inf")
+
+    rows = sorted(rows, key=_ncrps)
+    header = ["#", "model_id", "variant", "nCRPS", "nMAE", "Accuracy", "R2", "step", "loss"]
+    body = []
+    for i, r in enumerate(rows, 1):
+        m = r.get("metrics", {}).get("mean", {})
+        o = r.get("training_outcome", {})
+        step = o.get("global_step")
+        body.append([
+            i,
+            r.get("model_id"),
+            r.get("variant") or "",
+            _fmt(m.get("nCRPS")),
+            _fmt(m.get("nMAE")),
+            _fmt(m.get("Accuracy")),
+            _fmt(m.get("R2")),
+            step if step is not None else "—",
+            _fmt(o.get("final_loss")),
+        ])
+    print("=== Quick ranking (sorted by nCRPS, lower better) ===")
+    print(_table(header, body))
+    print("\nnCRPS / nMAE / loss: lower better.  Accuracy / R2: higher better.  #1 = best nCRPS.")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -114,6 +146,8 @@ def main() -> int:
     ap.add_argument("--family", default=None, help="config_hash to compare seeds of")
     ap.add_argument("--group-family", action="store_true",
                     help="aggregate seeds sharing a config_hash into mean±std")
+    ap.add_argument("--summary", action="store_true",
+                    help="compact one-line-per-model ranking sorted by nCRPS (lower better)")
     ap.add_argument("--leaderboard", default=str(DEFAULT_LEADERBOARD))
     args = ap.parse_args()
 
@@ -124,6 +158,9 @@ def main() -> int:
     picked = _pick(rows, args)
     if not picked:
         return _err("no models matched the selection")
+
+    if args.summary:
+        return _summary_view(picked)
 
     # --- Seed-family aggregation (mean ± std) ---
     if args.group_family:

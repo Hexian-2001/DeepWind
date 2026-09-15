@@ -56,6 +56,54 @@ The sections below describe how a completed train → eval run is registered int
 a **git-committed JSONL leaderboard** (`results/leaderboard.jsonl`), and how to
 compare, export paper tables, and run seed sweeps.
 
+## 0. Step-by-step 快速上手
+
+每次有一个新模型（新架构 / 新超参 / 新 seed / 训练完成），重复下面 5 步。所有命令在仓库根目录执行。
+
+**第 1 步 — 评估**（若该模型还没评估过；`CKPT` 指向训练产出的 `checkpoints` 目录）
+```bash
+CKPT=/scratch/pawsey0115/hwang4/projects/deepwind/runs/DeepWind-Research/deepwind-small-paper-seed42/checkpoints
+sbatch --export=ALL,MODEL=small,CKPT=${CKPT},EVAL_NAME=eval-small-paper scripts/setonix/eval_paper.sbatch
+# 等 eval 完成（squeue 里 COMPLETED）后聚合：
+/scratch/pawsey0115/hwang4/conda_envs/deepwind/bin/python tools/aggregate_eval.py \
+  /scratch/pawsey0115/hwang4/projects/deepwind/runs/results/deepwind/eval-small-paper
+```
+
+**第 2 步 — 注册进排行榜**（一行 = 一个模型）
+```bash
+/scratch/pawsey0115/hwang4/conda_envs/deepwind/bin/python tools/register_eval.py \
+  /scratch/pawsey0115/hwang4/projects/deepwind/runs/results/deepwind/eval-small-paper \
+  --model-id deepwind-small-paper-seed42 --variant small --tags paper-spec,baseline,seed42
+```
+
+**第 3 步 — 快速看排名**（哪个模型可能更好，一眼）
+```bash
+python tools/compare_models.py --summary                    # 全部模型，按 nCRPS 升序
+python tools/compare_models.py --summary --variant small,base,large
+```
+
+**第 4 步 — 详细对比**（逐数据集 / 逐时长，定位差异在哪）
+```bash
+python tools/compare_models.py --variant small,base,large
+python tools/compare_models.py --family <config_hash> --group-family   # 同设计多 seed → mean±std
+```
+
+**第 5 步 — 导出论文表**
+```bash
+python tools/export_report.py --format latex --out results_table.tex   # 或 markdown / csv
+```
+
+**常用命令速查**
+
+| 想做什么 | 命令 |
+|---|---|
+| 看原始记录（JSONL） | `cat results/leaderboard.jsonl` |
+| 快速排名 | `python tools/compare_models.py --summary` |
+| 详细对比 | `python tools/compare_models.py --variant small,base,large` |
+| 论文表 | `python tools/export_report.py --format latex` |
+| seed 方差（mean±std） | `python tools/compare_models.py --family <hash> --group-family` |
+| 一键多 seed 训练 | `python tools/run_seed_sweep.py --model small --seeds 42,43,44` |
+
 ## 1. 理念
 
 - **源真相 = `results/leaderboard.jsonl`**（append-only、一行一个被评估模型、随仓库 git 提交，
@@ -150,13 +198,14 @@ python tools/register_eval.py \
 ## 4. 对比
 
 ```bash
+python tools/compare_models.py --summary                       # 快速排名（一行一模型，按 nCRPS 升序）
 python tools/compare_models.py --all
 python tools/compare_models.py --variant small,base,large
 python tools/compare_models.py deepwind-small-paper-seed42 deepwind-base-paper-seed42
 python tools/compare_models.py --family <config_hash> --group-family   # 同设计多 seed → mean±std
 ```
 
-输出：宏观指标表 + 逐数据集 nCRPS/nMAE 表 + 逐时长 nCRPS，每列 ` <--` 标注该行最优。
+`--summary` 输出紧凑排名表；默认输出宏观指标表 + 逐数据集 nCRPS/nMAE 表 + 逐时长 nCRPS，每列 ` <--` 标注该行最优。
 
 ## 5. 导出论文表
 

@@ -1,5 +1,104 @@
 # Reproducibility record
 
+## Project map — where everything lives
+
+One-page overview of the DeepWind codebase and its on-disk layout on Setonix.
+All paths are absolute and current as of the 2026-09 retrain campaign.
+
+### Repo, environment & data
+
+| Item | Path |
+|---|---|
+| Code repo (branch `release/open-source-v1`) | `/software/projects/pawsey0115/hwang4/research_projects/DeepWind` |
+| Dedicated venv (Python 3.11.16) | `/scratch/pawsey0115/hwang4/conda_envs/deepwind` |
+| venv interpreter | `/scratch/pawsey0115/hwang4/conda_envs/deepwind/bin/python` |
+| Data root | `/scratch/pawsey0115/hwang4/deepwindData` |
+| Runs root (`DEEPWIND_RUNS_ROOT`) | `/scratch/pawsey0115/hwang4/projects/deepwind/runs` |
+
+```
+deepwindData/
+  train/            # 127,297 pretraining series (.npy)
+  eval/             # held-out eval series
+  test/             # 8 WindBench benchmark datasets (.npy)
+  train_metadata.csv / eval_metadata.csv / test_metadata.csv
+```
+
+### Entry-point scripts
+
+| Task | Script | Config | Setonix launcher |
+|---|---|---|---|
+| Pretrain | `train.py` | `configs/train.yaml` + `configs/training/deepwind_{small,base,large}.yaml` | `scripts/setonix/train_paper.sbatch` (`MODEL=small\|base\|large`) |
+| Finetune | `finetune.py` | `configs/finetune.yaml` + `configs/training/finetune.yaml` | — (run directly) |
+| Inference | `infer.py` | `configs/infer.yaml` | — (run directly) |
+| Evaluate | `evaluate.py` | `configs/eval.yaml` | `scripts/setonix/eval_paper.sbatch` |
+
+### Source (`src/`)
+
+| Package | Contents |
+|---|---|
+| `src/models/` | `deepwind.py`, `backbone.py`, `configuration.py`, `adapter.py`, `layers.py` |
+| `src/data/` | datasets & dataloaders |
+| `src/evaluation/` | eval metrics & harness |
+| `src/inference/` | inference helpers |
+| `src/losses/` | losses (CRPS / quantile) |
+| `src/layers/` | Transformer building blocks |
+| `src/utils/` | `provenance.py`, `trainer.py`, `registry.py`, `metrics.py`, `distributed.py`, `cache.py`, `constants.py`, `vis.py` |
+
+### Configs (`configs/`)
+
+| Dir | Contents |
+|---|---|
+| `configs/model/` | architecture: `deepwind_{small,base,large,debug}.yaml` |
+| `configs/training/` | `deepwind_{small,base,large}.yaml`, `finetune.yaml` |
+| `configs/data/` | `train.yaml`, `finetune.yaml`, `wind_test.yaml` |
+| `configs/data_eval/` | per-dataset eval configs |
+| top-level | `train.yaml`, `eval.yaml`, `finetune.yaml`, `infer.yaml` |
+
+### Model weights (checkpoints)
+
+Each training run lives under `runs/DeepWind-Research/<run_name>/` and holds the
+weights in `checkpoints/`:
+
+```
+DeepWind-Research/<run_name>/
+  checkpoints/
+    checkpoint-100000/    # HF-format checkpoint dir
+    model.safetensors     # consolidated weights
+    config.json           # serialized DeepWindConfig
+    trainer_state.json    # global_step + loss history
+    run_info.json         # resolved Hydra config + git/provenance snapshot
+  logs/                   # train.log
+  metadata/               # git_commit.txt, pip_freeze.txt, command.txt
+  wandb/                  # offline wandb artifacts
+```
+
+Example (Small):
+`runs/DeepWind-Research/deepwind-small-paper-seed42-20260914-164253/checkpoints/checkpoint-100000/`
+
+### Experiment records
+
+| Record | Location |
+|---|---|
+| Evaluation outputs | `runs/results/deepwind/<eval_name>/` (per-dataset dirs + `_aggregate.json` + `run_info.json`) |
+| Leaderboard (git-committed source of truth) | `results/leaderboard.jsonl` |
+| Pipeline state (cron driver) | `runs/pipeline_state.json` |
+| wandb (online curves) | `https://wandb.ai/hexian-2001-shanxi-university/DeepWind-Research` |
+
+### Tooling (`tools/`) & docs
+
+| Script | Purpose |
+|---|---|
+| `aggregate_eval.py` | macro-average an eval into `_aggregate.json` |
+| `register_eval.py` | register one eval into the leaderboard |
+| `compare_models.py` | rank / compare / CSV export |
+| `export_report.py` | paper tables (latex / markdown / csv) |
+| `run_seed_sweep.py` | submit multi-seed training |
+| `audit_data_splits.py` / `audit_dataset.py` / `clean_data_manifests.py` | data hygiene |
+
+Paper figure/table scripts live in `reproduction/`; longer docs in `docs/`
+(`architecture-audit.md`, `asset-inventory.md`, `data.md`, `pawsey.md`,
+`refactor-roadmap.md`).
+
 ## Published specification
 
 DeepWind-Large is described as an 18-layer, 1024-dimensional decoder-only

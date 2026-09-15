@@ -93,6 +93,7 @@ Example (Small):
 | `compare_models.py` | rank / compare / CSV export |
 | `export_report.py` | paper tables (latex / markdown / csv) |
 | `plot_results.py` | publication figures (ranking / macro / per-dataset / per-horizon) |
+| `plot_forecasts.py` | per-sample forecast plots (history + point + 50%/90% PI) |
 | `run_seed_sweep.py` | submit multi-seed training |
 | `audit_data_splits.py` / `audit_dataset.py` / `clean_data_manifests.py` | data hygiene |
 
@@ -369,6 +370,40 @@ are "lower is better" are marked `↓`, "higher is better" `↑`. Requires matpl
 The figures are **regenerated views** over `results/leaderboard.jsonl` — the
 JSONL stays the committed source of truth, and `reports/` is git-ignored
 (regenerable on demand).
+
+### 6.1 Forecast visualisations (prediction intervals)
+
+```bash
+"$PY" tools/plot_forecasts.py --model-id deepwind-small-paper-seed42
+"$PY" tools/plot_forecasts.py --model-id deepwind-base-paper-seed42 --horizons H1,H6
+```
+
+For each (dataset, horizon) this renders one figure with a few stacked forecast
+windows — history, ground truth, point (median) forecast, and the 50% / 90%
+prediction intervals — straight from the eval raw results
+(`<eval_dir>/raw_results/<dataset>/raw_H<h>.npz`, physical MW). It reuses the
+codebase's own `src/utils/vis.py::visualize_forecasts`.
+
+**Output layout** (git-ignored, regenerable):
+
+```
+reports/forecasts/<dataset>/H<h>__<model_id>.png
+```
+
+**Cross-model consistency:** the exact sample windows are pinned in
+`results/forecast_samples.json` (git-committed). Every model plots the *same*
+windows, so `H1__deepwind-small-…png` vs `H1__deepwind-base-…png` are directly
+comparable. The manifest is auto-created on first run (deterministic, `seed=42`)
+and reused verbatim thereafter — re-run with the same `--horizons` and the
+selection never changes.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--horizons` | `H1,H6` | which horizons to plot per dataset |
+| `--num-plots` | `3` | sample windows per (dataset, horizon) |
+| `--plot-hist-len` | `144` | trailing history steps shown |
+| `--datasets` | all 8 | subset of benchmark datasets |
+| `--seed` | `42` | seed for the initial sample selection |
 
 ## 7. Seed sweep
 

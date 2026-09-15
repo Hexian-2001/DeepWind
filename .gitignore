@@ -22,9 +22,11 @@ notebooks/.ipynb_checkpoints/
 
 # Logs & outputs
 logs/
+slurm-*.out
 outputs/
 results/*
 !results/leaderboard.jsonl
+!results/forecast_samples.json
 reports/
 wandb/
 runs/

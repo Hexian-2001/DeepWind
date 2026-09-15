@@ -23,7 +23,8 @@ notebooks/.ipynb_checkpoints/
 # Logs & outputs
 logs/
 outputs/
-results/
+results/*
+!results/leaderboard.jsonl
 wandb/
 runs/
 .coverage

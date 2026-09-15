@@ -60,6 +60,11 @@ compare, export paper tables, and run seed sweeps.
 
 每次有一个新模型（新架构 / 新超参 / 新 seed / 训练完成），重复下面 5 步。所有命令在仓库根目录执行。
 
+> **环境说明**：排行榜相关工具（`register_eval.py` / `compare_models.py` / `export_report.py` /
+> `run_seed_sweep.py`）都是**纯 Python 标准库**（不依赖 numpy/torch），直接用 `python`（base 环境即可）
+> 就能跑，无需加载 conda。只有「训练 / 评估 / 聚合」（`train_paper.sbatch`、`eval_paper.sbatch`、
+> `aggregate_eval.py`）需要 `$DEEPWIND_VENV`（`/scratch/pawsey0115/hwang4/conda_envs/deepwind`）。
+
 **第 1 步 — 评估**（若该模型还没评估过；`CKPT` 指向训练产出的 `checkpoints` 目录）
 ```bash
 CKPT=/scratch/pawsey0115/hwang4/projects/deepwind/runs/DeepWind-Research/deepwind-small-paper-seed42/checkpoints
@@ -71,7 +76,7 @@ sbatch --export=ALL,MODEL=small,CKPT=${CKPT},EVAL_NAME=eval-small-paper scripts/
 
 **第 2 步 — 注册进排行榜**（一行 = 一个模型）
 ```bash
-/scratch/pawsey0115/hwang4/conda_envs/deepwind/bin/python tools/register_eval.py \
+python tools/register_eval.py \
   /scratch/pawsey0115/hwang4/projects/deepwind/runs/results/deepwind/eval-small-paper \
   --model-id deepwind-small-paper-seed42 --variant small --tags paper-spec,baseline,seed42
 ```
@@ -80,6 +85,7 @@ sbatch --export=ALL,MODEL=small,CKPT=${CKPT},EVAL_NAME=eval-small-paper scripts/
 ```bash
 python tools/compare_models.py --summary                    # 全部模型，按 nCRPS 升序
 python tools/compare_models.py --summary --variant small,base,large
+python tools/compare_models.py --summary --csv ranking.csv  # 导出 CSV（Excel 直接打开）
 ```
 
 **第 4 步 — 详细对比**（逐数据集 / 逐时长，定位差异在哪）
@@ -99,6 +105,7 @@ python tools/export_report.py --format latex --out results_table.tex   # 或 mar
 |---|---|
 | 看原始记录（JSONL） | `cat results/leaderboard.jsonl` |
 | 快速排名 | `python tools/compare_models.py --summary` |
+| 排名导出 CSV | `python tools/compare_models.py --summary --csv ranking.csv` |
 | 详细对比 | `python tools/compare_models.py --variant small,base,large` |
 | 论文表 | `python tools/export_report.py --format latex` |
 | seed 方差（mean±std） | `python tools/compare_models.py --family <hash> --group-family` |
@@ -199,6 +206,7 @@ python tools/register_eval.py \
 
 ```bash
 python tools/compare_models.py --summary                       # 快速排名（一行一模型，按 nCRPS 升序）
+python tools/compare_models.py --summary --csv ranking.csv      # 排名导出 CSV
 python tools/compare_models.py --all
 python tools/compare_models.py --variant small,base,large
 python tools/compare_models.py deepwind-small-paper-seed42 deepwind-base-paper-seed42

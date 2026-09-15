@@ -5,6 +5,7 @@
 Usage:
     python tools/compare_models.py --summary                    # quick ranking by nCRPS
     python tools/compare_models.py --summary --variant small,base,large
+    python tools/compare_models.py --summary --csv ranking.csv  # ranking as CSV
     python tools/compare_models.py --all
     python tools/compare_models.py --variant small,base,large
     python tools/compare_models.py deepwind-small-paper-seed42 deepwind-base-paper-seed42
@@ -14,11 +15,10 @@ from __future__ import annotations
 
 import argparse
 import re
+import statistics
 import sys
 from collections import defaultdict
 from pathlib import Path
-
-import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from leaderboard_lib import (  # noqa: E402
@@ -105,29 +105,42 @@ def _group_by_family(rows):
     return list(fams.values())
 
 
-def _summary_view(rows):
+def _summary_view(rows, csv_path=None):
     """Compact one-line-per-model ranking sorted by nCRPS (primary metric)."""
     def _ncrps(r):
         v = r.get("metrics", {}).get("mean", {}).get("nCRPS")
         return v if _finite(v) else float("inf")
 
     rows = sorted(rows, key=_ncrps)
-    header = ["#", "model_id", "variant", "nCRPS", "nMAE", "Accuracy", "R2", "step", "loss"]
-    body = []
+    raw_rows = []
     for i, r in enumerate(rows, 1):
         m = r.get("metrics", {}).get("mean", {})
         o = r.get("training_outcome", {})
-        step = o.get("global_step")
+        raw_rows.append([
+            i, r.get("model_id"), r.get("variant") or "",
+            m.get("nCRPS"), m.get("nMAE"), m.get("Accuracy"), m.get("R2"),
+            o.get("global_step"), o.get("final_loss"),
+        ])
+
+    if csv_path:
+        import csv as _csv
+        with open(csv_path, "w", newline="") as f:
+            w = _csv.writer(f)
+            w.writerow(["rank", "model_id", "variant", "nCRPS", "nMAE",
+                        "Accuracy", "R2", "global_step", "final_loss"])
+            for row in raw_rows:
+                w.writerow(["" if v is None else v for v in row])
+        print(f"wrote {csv_path}")
+        return 0
+
+    header = ["#", "model_id", "variant", "nCRPS", "nMAE", "Accuracy", "R2", "step", "loss"]
+    body = []
+    for row in raw_rows:
         body.append([
-            i,
-            r.get("model_id"),
-            r.get("variant") or "",
-            _fmt(m.get("nCRPS")),
-            _fmt(m.get("nMAE")),
-            _fmt(m.get("Accuracy")),
-            _fmt(m.get("R2")),
-            step if step is not None else "—",
-            _fmt(o.get("final_loss")),
+            row[0], row[1], row[2],
+            _fmt(row[3]), _fmt(row[4]), _fmt(row[5]), _fmt(row[6]),
+            row[7] if row[7] is not None else "—",
+            _fmt(row[8]),
         ])
     print("=== Quick ranking (sorted by nCRPS, lower better) ===")
     print(_table(header, body))
@@ -148,6 +161,8 @@ def main() -> int:
                     help="aggregate seeds sharing a config_hash into mean±std")
     ap.add_argument("--summary", action="store_true",
                     help="compact one-line-per-model ranking sorted by nCRPS (lower better)")
+    ap.add_argument("--csv", default=None, metavar="PATH",
+                    help="with --summary: write the ranking as CSV to PATH")
     ap.add_argument("--leaderboard", default=str(DEFAULT_LEADERBOARD))
     args = ap.parse_args()
 
@@ -160,7 +175,7 @@ def main() -> int:
         return _err("no models matched the selection")
 
     if args.summary:
-        return _summary_view(picked)
+        return _summary_view(picked, args.csv)
 
     # --- Seed-family aggregation (mean ± std) ---
     if args.group_family:
@@ -174,8 +189,8 @@ def main() -> int:
             for k in HEADLINE:
                 vals = [r.get("metrics", {}).get("mean", {}).get(k) for r in fam]
                 vals = [v for v in vals if _finite(v)]
-                m[k] = float(np.mean(vals)) if vals else None
-                s[k] = float(np.std(vals)) if len(vals) > 1 else 0.0
+                m[k] = float(statistics.mean(vals)) if vals else None
+                s[k] = float(statistics.stdev(vals)) if len(vals) > 1 else 0.0
             labels.append(label)
             means.append(m)
             stds.append(s)

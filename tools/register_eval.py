@@ -18,11 +18,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import statistics
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-
-import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from leaderboard_lib import (  # noqa: E402
@@ -65,7 +64,7 @@ def _load_metrics(eval_dir: Path) -> dict:
             if _finite(v):
                 per[ds][k].append(v)
     per_dataset = {
-        ds: {k: float(np.mean(vs)) for k, vs in vals.items() if vs}
+        ds: {k: float(statistics.mean(vs)) for k, vs in vals.items() if vs}
         for ds, vals in per.items()
     }
 

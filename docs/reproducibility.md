@@ -411,6 +411,7 @@ selection never changes.
 ```bash
 "$PY" tools/plot_rolling_forecasts.py --model-id deepwind-small-paper-seed42
 "$PY" tools/plot_rolling_forecasts.py --model-id deepwind-base-paper-seed42 --steps 128
+"$PY" tools/plot_rolling_forecasts.py --model-id deepwind-base-paper-seed42 --steps 256 --num-plots 3
 ```
 
 A single window is hard to judge in isolation (for 60-min data H1 is *one* step), so
@@ -430,13 +431,15 @@ not a single autonomous multi-step rollout.
 reports/forecasts_rolling/<dataset>/H<h>__<model_id>__T<steps>.png
 ```
 
-**Cross-model consistency:** the stitched segment start is pinned per (dataset,
-horizon) in `results/forecast_samples.json` (`rolling.starts`, deterministic
-`seed=42`) and reused verbatim — every model plots the same contiguous block.
+**Cross-model consistency:** the stitched segment starts are pinned per (dataset,
+horizon) in `results/forecast_samples.json` (`rolling.starts` — a list of
+`--num-plots` start windows, deterministic `seed=42`) and reused verbatim, so every
+model plots the *same* contiguous blocks.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--steps` | `128` | fixed number of steps per figure (independent of dataset resolution) |
+| `--steps` | `128` | fixed number of steps per panel (independent of dataset resolution) |
+| `--num-plots` | `3` | stacked segments (subplots) per (dataset, horizon) |
 | `--horizons` | `H1,H6` | which horizons to plot per dataset |
 | `--datasets` | all 8 | subset of benchmark datasets |
 | `--seed` | `42` | seed for the deterministic start selection |

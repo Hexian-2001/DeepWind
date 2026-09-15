@@ -92,6 +92,7 @@ Example (Small):
 | `register_eval.py` | register one eval into the leaderboard |
 | `compare_models.py` | rank / compare / CSV export |
 | `export_report.py` | paper tables (latex / markdown / csv) |
+| `plot_results.py` | publication figures (ranking / macro / per-dataset / per-horizon) |
 | `run_seed_sweep.py` | submit multi-seed training |
 | `audit_data_splits.py` / `audit_dataset.py` / `clean_data_manifests.py` | data hygiene |
 
@@ -217,6 +218,7 @@ sbatch --export=ALL,MODEL=small,CKPT=${CKPT},EVAL_NAME=eval-small-paper scripts/
 | Ranking as CSV | `"$PY" tools/compare_models.py --summary --csv ranking.csv` |
 | Detailed comparison | `"$PY" tools/compare_models.py --variant small,base,large` |
 | Paper table | `"$PY" tools/export_report.py --format latex` |
+| Plot figures | `"$PY" tools/plot_results.py` |
 | Seed variance (mean±std) | `"$PY" tools/compare_models.py --family <hash> --group-family` |
 | Multi-seed training in one shot | `"$PY" tools/run_seed_sweep.py --model small --seeds 42,43,44` |
 
@@ -341,7 +343,34 @@ row's best value with ` <--`.
 The LaTeX output is a booktabs table (`\toprule`/`\midrule`/`\bottomrule`) with
 the best value bolded via `\textbf{}`.
 
-## 6. Seed sweep
+## 6. Visualize (figures)
+
+```bash
+"$PY" tools/plot_results.py                            # all models -> reports/figures/
+"$PY" tools/plot_results.py --variant small,base,large
+"$PY" tools/plot_results.py --formats png,svg --dpi 200
+```
+
+`plot_results.py` renders publication-quality figures from the leaderboard into
+`reports/figures/`:
+
+| File | Content |
+|---|---|
+| `ranking_ncrps.png` | mean nCRPS per model, sorted (headline "which is best") |
+| `macro_metrics.png` | one panel per HEADLINE metric, best value outlined |
+| `per_dataset_ncrps.png` | nCRPS grouped by the 8 benchmark datasets |
+| `per_horizon_ncrps.png` | nCRPS vs horizon (H1–H12), one line per model |
+| `seed_sweep_<variant>.png` | per-horizon lines per seed (only when >1 seed shares a config_hash) |
+
+Colors are fixed per variant (small=blue, base=orange, large=green). Metrics that
+are "lower is better" are marked `↓`, "higher is better" `↑`. Requires matplotlib
+(installed in the DeepWind venv; the `reproduction/` figures use it too).
+
+The figures are **regenerated views** over `results/leaderboard.jsonl` — the
+JSONL stays the committed source of truth, and `reports/` is git-ignored
+(regenerable on demand).
+
+## 7. Seed sweep
 
 ```bash
 "$PY" tools/run_seed_sweep.py --model small --seeds 42,43,44 --dry-run
@@ -361,7 +390,7 @@ After each seed finishes training → evaluate → `register_eval.py`. Because
 > seed sweep's wandb tag still reads `seed42`; the true seed is the leaderboard's
 > `seed` field and `wandb.notes`/`run_name`.
 
-## 7. config_hash semantics
+## 8. config_hash semantics
 
 ```
 config_hash = sha256( canonical_json({ model, training', data', data_eval }) )
@@ -374,7 +403,7 @@ From `training` we strip the **run identity fields** (`run_name` / `output_dir` 
 from `data`. **The seed never participates in the hash** → the same design with
 different seeds yields the same `config_hash` and groups as one family.
 
-## 8. Reuse & boundaries
+## 9. Reuse & boundaries
 
 - These tools **only read** `run_info.json`; they do not re-collect provenance
   (`src/utils/provenance.py` already does that).

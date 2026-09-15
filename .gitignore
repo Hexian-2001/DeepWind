@@ -25,6 +25,7 @@ logs/
 outputs/
 results/*
 !results/leaderboard.jsonl
+reports/
 wandb/
 runs/
 .coverage

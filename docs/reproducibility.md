@@ -94,6 +94,7 @@ Example (Small):
 | `export_report.py` | paper tables (latex / markdown / csv) |
 | `plot_results.py` | publication figures (ranking / macro / per-dataset / per-horizon) |
 | `plot_forecasts.py` | per-sample forecast plots (history + point + 50%/90% PI) |
+| `plot_rolling_forecasts.py` | stitched rolling forecast (backtest, fixed-length, PI bands) |
 | `run_seed_sweep.py` | submit multi-seed training |
 | `audit_data_splits.py` / `audit_dataset.py` / `clean_data_manifests.py` | data hygiene |
 
@@ -404,6 +405,41 @@ selection never changes.
 | `--plot-hist-len` | `144` | trailing history steps shown |
 | `--datasets` | all 8 | subset of benchmark datasets |
 | `--seed` | `42` | seed for the initial sample selection |
+
+### 6.2 Rolling (stitched) forecast visualisations
+
+```bash
+"$PY" tools/plot_rolling_forecasts.py --model-id deepwind-small-paper-seed42
+"$PY" tools/plot_rolling_forecasts.py --model-id deepwind-base-paper-seed42 --steps 128
+```
+
+A single window is hard to judge in isolation (for 60-min data H1 is *one* step), so
+this tool stitches consecutive windows into one contiguous rolling forecast — a
+**rolling-origin backtest**. It reads the same eval raw results and is valid because
+`DeepWindTestDataset` slides its context by exactly `pred_len` (stride defaults to
+`pred_len`) and the evaluator re-sorts samples by index: consecutive windows are
+contiguous, so `targets.reshape(-1)` reproduces an unbroken slice of the test series.
+
+Note the semantics: every window is still an independent forecast conditioned on its
+own *true* 8192-step history (`mqd_infer=true`), so the figure is a backtest view —
+not a single autonomous multi-step rollout.
+
+**Output layout** (git-ignored, regenerable):
+
+```
+reports/forecasts_rolling/<dataset>/H<h>__<model_id>__T<steps>.png
+```
+
+**Cross-model consistency:** the stitched segment start is pinned per (dataset,
+horizon) in `results/forecast_samples.json` (`rolling.starts`, deterministic
+`seed=42`) and reused verbatim — every model plots the same contiguous block.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--steps` | `128` | fixed number of steps per figure (independent of dataset resolution) |
+| `--horizons` | `H1,H6` | which horizons to plot per dataset |
+| `--datasets` | all 8 | subset of benchmark datasets |
+| `--seed` | `42` | seed for the deterministic start selection |
 
 ## 7. Seed sweep
 

@@ -116,6 +116,7 @@ def main() -> int:
 
     model_id = args.model_id or eval_dir.name
     out = Path(args.out)
+    rng = np.random.RandomState(args.seed)   # seed once: indices vary across datasets
     written = []
 
     for ds in datasets:
@@ -133,7 +134,7 @@ def main() -> int:
                 idx = [int(i) for i in d[h] if 0 <= int(i) < n]
             else:
                 idx = sorted(int(i) for i in
-                             np.random.RandomState(args.seed).choice(n, size=n_plot, replace=False))
+                             rng.choice(n, size=n_plot, replace=False))
                 d[h] = idx
                 dirty = True
 

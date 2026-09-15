@@ -61,12 +61,18 @@ compare, export paper tables, and run seed sweeps.
 Whenever you have a new model (new architecture / hyperparameters / seed / a
 finished training run), repeat these 5 steps. All commands run from the repo root.
 
-> **Environment note**: the leaderboard tools (`register_eval.py` /
-> `compare_models.py` / `export_report.py` / `run_seed_sweep.py`) are **pure
-> Python standard library** (no numpy/torch), so plain `python` works — no conda
-> environment needed. Only training / evaluation / aggregation
-> (`train_paper.sbatch`, `eval_paper.sbatch`, `aggregate_eval.py`) require
-> `$DEEPWIND_VENV` (`/scratch/pawsey0115/hwang4/conda_envs/deepwind`).
+> **Python — required setup (read first).** The base conda env is broken: its
+> Python 3.14 crashes at startup (`init_fs_encoding` codec error), and
+> `conda activate` is unusable for the same reason (conda itself runs on that
+> Python). Always use the DeepWind venv Python. Run this once per shell, then the
+> `$PY` commands below work as written:
+> ```bash
+> export PY=/scratch/pawsey0115/hwang4/conda_envs/deepwind/bin/python
+> ```
+> Equivalent alternative (no `$PY` needed): prepend it to PATH so plain `python`
+> resolves to it — `export PATH=/scratch/pawsey0115/hwang4/conda_envs/deepwind/bin:$PATH`.
+> The leaderboard tools are pure stdlib, but they still need a *working* Python;
+> the venv provides Python 3.11.16.
 
 **Step 1 — Evaluate** (skip if already evaluated; `CKPT` points at the training
 run's `checkpoints` directory)
@@ -74,46 +80,46 @@ run's `checkpoints` directory)
 CKPT=/scratch/pawsey0115/hwang4/projects/deepwind/runs/DeepWind-Research/deepwind-small-paper-seed42/checkpoints
 sbatch --export=ALL,MODEL=small,CKPT=${CKPT},EVAL_NAME=eval-small-paper scripts/setonix/eval_paper.sbatch
 # after the eval job reaches COMPLETED in squeue, aggregate:
-/scratch/pawsey0115/hwang4/conda_envs/deepwind/bin/python tools/aggregate_eval.py \
+"$PY" tools/aggregate_eval.py \
   /scratch/pawsey0115/hwang4/projects/deepwind/runs/results/deepwind/eval-small-paper
 ```
 
 **Step 2 — Register** (one row = one model)
 ```bash
-python tools/register_eval.py \
+"$PY" tools/register_eval.py \
   /scratch/pawsey0115/hwang4/projects/deepwind/runs/results/deepwind/eval-small-paper \
   --model-id deepwind-small-paper-seed42 --variant small --tags paper-spec,baseline,seed42
 ```
 
 **Step 3 — Quick ranking** (which model looks best, at a glance)
 ```bash
-python tools/compare_models.py --summary                    # all models, sorted by nCRPS ascending
-python tools/compare_models.py --summary --variant small,base,large
-python tools/compare_models.py --summary --csv ranking.csv  # export as CSV (open in Excel)
+"$PY" tools/compare_models.py --summary                    # all models, sorted by nCRPS ascending
+"$PY" tools/compare_models.py --summary --variant small,base,large
+"$PY" tools/compare_models.py --summary --csv ranking.csv  # export as CSV (open in Excel)
 ```
 
 **Step 4 — Detailed comparison** (per-dataset / per-horizon, to locate the gap)
 ```bash
-python tools/compare_models.py --variant small,base,large
-python tools/compare_models.py --family <config_hash> --group-family   # same design, multiple seeds -> mean±std
+"$PY" tools/compare_models.py --variant small,base,large
+"$PY" tools/compare_models.py --family <config_hash> --group-family   # same design, multiple seeds -> mean±std
 ```
 
 **Step 5 — Export paper table**
 ```bash
-python tools/export_report.py --format latex --out results_table.tex   # or markdown / csv
+"$PY" tools/export_report.py --format latex --out results_table.tex   # or markdown / csv
 ```
 
-**Quick reference**
+**Quick reference** (remember `export PY=...` first)
 
 | Want to ... | Command |
 |---|---|
 | Inspect raw records (JSONL) | `cat results/leaderboard.jsonl` |
-| Quick ranking | `python tools/compare_models.py --summary` |
-| Ranking as CSV | `python tools/compare_models.py --summary --csv ranking.csv` |
-| Detailed comparison | `python tools/compare_models.py --variant small,base,large` |
-| Paper table | `python tools/export_report.py --format latex` |
-| Seed variance (mean±std) | `python tools/compare_models.py --family <hash> --group-family` |
-| Multi-seed training in one shot | `python tools/run_seed_sweep.py --model small --seeds 42,43,44` |
+| Quick ranking | `"$PY" tools/compare_models.py --summary` |
+| Ranking as CSV | `"$PY" tools/compare_models.py --summary --csv ranking.csv` |
+| Detailed comparison | `"$PY" tools/compare_models.py --variant small,base,large` |
+| Paper table | `"$PY" tools/export_report.py --format latex` |
+| Seed variance (mean±std) | `"$PY" tools/compare_models.py --family <hash> --group-family` |
+| Multi-seed training in one shot | `"$PY" tools/run_seed_sweep.py --model small --seeds 42,43,44` |
 
 ## 1. Concept
 
@@ -151,13 +157,13 @@ same `output_dir`, so training auto-resumes across the 24h wall-clock limit).
 CKPT=/scratch/pawsey0115/hwang4/projects/deepwind/runs/DeepWind-Research/deepwind-small-paper-seed42/checkpoints
 sbatch --export=ALL,MODEL=small,CKPT=... scripts/setonix/eval_paper.sbatch
 # after completion:
-python tools/aggregate_eval.py <eval_dir>
+"$PY" tools/aggregate_eval.py <eval_dir>
 ```
 
 ### 2.3 Register
 
 ```bash
-python tools/register_eval.py \
+"$PY" tools/register_eval.py \
   /scratch/pawsey0115/hwang4/projects/deepwind/runs/results/deepwind/eval-small-paper \
   --model-id deepwind-small-paper-seed42 --variant small --tags paper-spec,baseline,seed42
 ```
@@ -213,12 +219,12 @@ winner automatically):
 ## 4. Compare
 
 ```bash
-python tools/compare_models.py --summary                       # quick ranking (one line per model, nCRPS ascending)
-python tools/compare_models.py --summary --csv ranking.csv     # ranking as CSV
-python tools/compare_models.py --all
-python tools/compare_models.py --variant small,base,large
-python tools/compare_models.py deepwind-small-paper-seed42 deepwind-base-paper-seed42
-python tools/compare_models.py --family <config_hash> --group-family   # same design, multiple seeds -> mean±std
+"$PY" tools/compare_models.py --summary                       # quick ranking (one line per model, nCRPS ascending)
+"$PY" tools/compare_models.py --summary --csv ranking.csv     # ranking as CSV
+"$PY" tools/compare_models.py --all
+"$PY" tools/compare_models.py --variant small,base,large
+"$PY" tools/compare_models.py deepwind-small-paper-seed42 deepwind-base-paper-seed42
+"$PY" tools/compare_models.py --family <config_hash> --group-family   # same design, multiple seeds -> mean±std
 ```
 
 `--summary` prints a compact ranking table; the default output prints the macro
@@ -228,9 +234,9 @@ row's best value with ` <--`.
 ## 5. Export paper table
 
 ```bash
-python tools/export_report.py --format latex    --out results_table.tex
-python tools/export_report.py --format markdown --variant small,base,large
-python tools/export_report.py --format csv      --all --out results_table.csv
+"$PY" tools/export_report.py --format latex    --out results_table.tex
+"$PY" tools/export_report.py --format markdown --variant small,base,large
+"$PY" tools/export_report.py --format csv      --all --out results_table.csv
 ```
 
 The LaTeX output is a booktabs table (`\toprule`/`\midrule`/`\bottomrule`) with
@@ -239,8 +245,8 @@ the best value bolded via `\textbf{}`.
 ## 6. Seed sweep
 
 ```bash
-python tools/run_seed_sweep.py --model small --seeds 42,43,44 --dry-run
-python tools/run_seed_sweep.py --model base  --seeds 42,43,44
+"$PY" tools/run_seed_sweep.py --model small --seeds 42,43,44 --dry-run
+"$PY" tools/run_seed_sweep.py --model base  --seeds 42,43,44
 ```
 
 Each seed submits an independent training run (`DEEPWIND_RUN_NAME=deepwind-<model>-paper-seed<s>`,

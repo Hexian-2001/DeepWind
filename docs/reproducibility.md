@@ -56,98 +56,105 @@ The sections below describe how a completed train → eval run is registered int
 a **git-committed JSONL leaderboard** (`results/leaderboard.jsonl`), and how to
 compare, export paper tables, and run seed sweeps.
 
-## 0. Step-by-step 快速上手
+## 0. Step-by-step quick start
 
-每次有一个新模型（新架构 / 新超参 / 新 seed / 训练完成），重复下面 5 步。所有命令在仓库根目录执行。
+Whenever you have a new model (new architecture / hyperparameters / seed / a
+finished training run), repeat these 5 steps. All commands run from the repo root.
 
-> **环境说明**：排行榜相关工具（`register_eval.py` / `compare_models.py` / `export_report.py` /
-> `run_seed_sweep.py`）都是**纯 Python 标准库**（不依赖 numpy/torch），直接用 `python`（base 环境即可）
-> 就能跑，无需加载 conda。只有「训练 / 评估 / 聚合」（`train_paper.sbatch`、`eval_paper.sbatch`、
-> `aggregate_eval.py`）需要 `$DEEPWIND_VENV`（`/scratch/pawsey0115/hwang4/conda_envs/deepwind`）。
+> **Environment note**: the leaderboard tools (`register_eval.py` /
+> `compare_models.py` / `export_report.py` / `run_seed_sweep.py`) are **pure
+> Python standard library** (no numpy/torch), so plain `python` works — no conda
+> environment needed. Only training / evaluation / aggregation
+> (`train_paper.sbatch`, `eval_paper.sbatch`, `aggregate_eval.py`) require
+> `$DEEPWIND_VENV` (`/scratch/pawsey0115/hwang4/conda_envs/deepwind`).
 
-**第 1 步 — 评估**（若该模型还没评估过；`CKPT` 指向训练产出的 `checkpoints` 目录）
+**Step 1 — Evaluate** (skip if already evaluated; `CKPT` points at the training
+run's `checkpoints` directory)
 ```bash
 CKPT=/scratch/pawsey0115/hwang4/projects/deepwind/runs/DeepWind-Research/deepwind-small-paper-seed42/checkpoints
 sbatch --export=ALL,MODEL=small,CKPT=${CKPT},EVAL_NAME=eval-small-paper scripts/setonix/eval_paper.sbatch
-# 等 eval 完成（squeue 里 COMPLETED）后聚合：
+# after the eval job reaches COMPLETED in squeue, aggregate:
 /scratch/pawsey0115/hwang4/conda_envs/deepwind/bin/python tools/aggregate_eval.py \
   /scratch/pawsey0115/hwang4/projects/deepwind/runs/results/deepwind/eval-small-paper
 ```
 
-**第 2 步 — 注册进排行榜**（一行 = 一个模型）
+**Step 2 — Register** (one row = one model)
 ```bash
 python tools/register_eval.py \
   /scratch/pawsey0115/hwang4/projects/deepwind/runs/results/deepwind/eval-small-paper \
   --model-id deepwind-small-paper-seed42 --variant small --tags paper-spec,baseline,seed42
 ```
 
-**第 3 步 — 快速看排名**（哪个模型可能更好，一眼）
+**Step 3 — Quick ranking** (which model looks best, at a glance)
 ```bash
-python tools/compare_models.py --summary                    # 全部模型，按 nCRPS 升序
+python tools/compare_models.py --summary                    # all models, sorted by nCRPS ascending
 python tools/compare_models.py --summary --variant small,base,large
-python tools/compare_models.py --summary --csv ranking.csv  # 导出 CSV（Excel 直接打开）
+python tools/compare_models.py --summary --csv ranking.csv  # export as CSV (open in Excel)
 ```
 
-**第 4 步 — 详细对比**（逐数据集 / 逐时长，定位差异在哪）
+**Step 4 — Detailed comparison** (per-dataset / per-horizon, to locate the gap)
 ```bash
 python tools/compare_models.py --variant small,base,large
-python tools/compare_models.py --family <config_hash> --group-family   # 同设计多 seed → mean±std
+python tools/compare_models.py --family <config_hash> --group-family   # same design, multiple seeds -> mean±std
 ```
 
-**第 5 步 — 导出论文表**
+**Step 5 — Export paper table**
 ```bash
-python tools/export_report.py --format latex --out results_table.tex   # 或 markdown / csv
+python tools/export_report.py --format latex --out results_table.tex   # or markdown / csv
 ```
 
-**常用命令速查**
+**Quick reference**
 
-| 想做什么 | 命令 |
+| Want to ... | Command |
 |---|---|
-| 看原始记录（JSONL） | `cat results/leaderboard.jsonl` |
-| 快速排名 | `python tools/compare_models.py --summary` |
-| 排名导出 CSV | `python tools/compare_models.py --summary --csv ranking.csv` |
-| 详细对比 | `python tools/compare_models.py --variant small,base,large` |
-| 论文表 | `python tools/export_report.py --format latex` |
-| seed 方差（mean±std） | `python tools/compare_models.py --family <hash> --group-family` |
-| 一键多 seed 训练 | `python tools/run_seed_sweep.py --model small --seeds 42,43,44` |
+| Inspect raw records (JSONL) | `cat results/leaderboard.jsonl` |
+| Quick ranking | `python tools/compare_models.py --summary` |
+| Ranking as CSV | `python tools/compare_models.py --summary --csv ranking.csv` |
+| Detailed comparison | `python tools/compare_models.py --variant small,base,large` |
+| Paper table | `python tools/export_report.py --format latex` |
+| Seed variance (mean±std) | `python tools/compare_models.py --family <hash> --group-family` |
+| Multi-seed training in one shot | `python tools/run_seed_sweep.py --model small --seeds 42,43,44` |
 
-## 1. 理念
+## 1. Concept
 
-- **源真相 = `results/leaderboard.jsonl`**（append-only、一行一个被评估模型、随仓库 git 提交，
-  可 code-review、可 diff、可追溯）。wandb 与 `run_info.json` 是它的上游原材料。
-- **一行 = 一个模型**：架构 + 训练超参 + seed + git commit + 全部指标（宏观 / 逐数据集 / 逐时长）。
-- **config_hash 归组设计**：同一设计（架构+训练+数据）不同 seed 的哈希相同 →
-  一个 seed sweep 自动归为同一 family，便于求 mean±std。
+- **Source of truth = `results/leaderboard.jsonl`** (append-only, one evaluated
+  model per line, committed to git — reviewable, diffable, traceable). wandb and
+  `run_info.json` are its upstream inputs.
+- **One line = one model**: architecture + training hyperparameters + seed + git
+  commit + all metrics (macro / per-dataset / per-horizon).
+- **config_hash grouping**: the same design (architecture + training + data)
+  with different seeds hashes identically → a seed sweep automatically groups as
+  one family, ready for mean±std.
 
-## 2. 流水线
+## 2. Pipeline
 
 ```
-训练 (train_paper.sbatch)
-   └─> 评估 (eval_paper.sbatch + tools/aggregate_eval.py)
-          └─> 注册 (tools/register_eval.py)          # 写入 results/leaderboard.jsonl
-                 ├─> 对比 (tools/compare_models.py)
-                 └─> 论文表 (tools/export_report.py)
+train (train_paper.sbatch)
+   └─> evaluate (eval_paper.sbatch + tools/aggregate_eval.py)
+          └─> register (tools/register_eval.py)          # writes results/leaderboard.jsonl
+                 ├─> compare (tools/compare_models.py)
+                 └─> paper table (tools/export_report.py)
 ```
 
-### 2.1 训练
+### 2.1 Train
 
 ```bash
 MODEL=small sbatch --export=ALL,MODEL=small scripts/setonix/train_paper.sbatch
 ```
 
-run name 固定为 `deepwind-small-paper-seed42`（`--requeue` 时同名 `output_dir` 自动断点续训，
-跨 24h 墙钟限制）。
+The run name is fixed to `deepwind-small-paper-seed42` (a `--requeue` reuses the
+same `output_dir`, so training auto-resumes across the 24h wall-clock limit).
 
-### 2.2 评估
+### 2.2 Evaluate
 
 ```bash
-CKPT=/scratch/pawsey0115/hwang4/projects/deepwind/runs/DeepWind-Research/deepwind-small-paper-seed42/checkpoints/checkpoint-100000 \
-  sbatch --export=ALL,MODEL=small,CKPT=... scripts/setonix/eval_paper.sbatch
-# 完成后
+CKPT=/scratch/pawsey0115/hwang4/projects/deepwind/runs/DeepWind-Research/deepwind-small-paper-seed42/checkpoints
+sbatch --export=ALL,MODEL=small,CKPT=... scripts/setonix/eval_paper.sbatch
+# after completion:
 python tools/aggregate_eval.py <eval_dir>
 ```
 
-### 2.3 注册（把一次评估写进排行榜）
+### 2.3 Register
 
 ```bash
 python tools/register_eval.py \
@@ -155,19 +162,19 @@ python tools/register_eval.py \
   --model-id deepwind-small-paper-seed42 --variant small --tags paper-spec,baseline,seed42
 ```
 
-`register_eval.py` 会自动读取：
+`register_eval.py` automatically reads:
 
-| 来源 | 取到的字段 |
+| Source | Fields |
 |------|-----------|
-| `<eval_dir>/run_info.json` | `checkpoint_path`、评估时 git commit、`run_name` |
-| `checkpoints/run_info.json`（训练时快照） | `config.model`（架构）、`config.training`（训练）、`config.seed`、`config.data.seed`、训练 git commit |
-| `<eval_dir>/_aggregate.json` | 宏观均值 + 逐时长 nCRPS |
-| `<eval_dir>/*/H_*.json` | 逐数据集指标 |
+| `<eval_dir>/run_info.json` | `checkpoint_path`, eval-time git commit, `run_name` |
+| `checkpoints/run_info.json` (training snapshot) | `config.model` (architecture), `config.training`, `config.seed`, `config.data.seed`, training git commit |
+| `<eval_dir>/_aggregate.json` | macro means + per-horizon nCRPS |
+| `<eval_dir>/*/H_*.json` | per-dataset metrics |
 | `checkpoint-*/trainer_state.json` | `global_step` + final loss |
 
-## 3. 排行榜 schema
+## 3. Leaderboard schema
 
-`results/leaderboard.jsonl` 每行一个 JSON：
+Each line of `results/leaderboard.jsonl` is one JSON object:
 
 ```json
 {
@@ -197,25 +204,28 @@ python tools/register_eval.py \
 }
 ```
 
-指标好坏方向（`compare_models.py` / `export_report.py` 用来自动标胜者）：
+Metric directions (used by `compare_models.py` / `export_report.py` to mark the
+winner automatically):
 
-- **越低越好**：`nCRPS`、`nMAE`、`MAE_Coverage`、`mean_wQuantileLoss`
-- **越高越好**：`Accuracy`、`Qualified_Rate`、`R2`
+- **Lower is better**: `nCRPS`, `nMAE`, `MAE_Coverage`, `mean_wQuantileLoss`
+- **Higher is better**: `Accuracy`, `Qualified_Rate`, `R2`
 
-## 4. 对比
+## 4. Compare
 
 ```bash
-python tools/compare_models.py --summary                       # 快速排名（一行一模型，按 nCRPS 升序）
-python tools/compare_models.py --summary --csv ranking.csv      # 排名导出 CSV
+python tools/compare_models.py --summary                       # quick ranking (one line per model, nCRPS ascending)
+python tools/compare_models.py --summary --csv ranking.csv     # ranking as CSV
 python tools/compare_models.py --all
 python tools/compare_models.py --variant small,base,large
 python tools/compare_models.py deepwind-small-paper-seed42 deepwind-base-paper-seed42
-python tools/compare_models.py --family <config_hash> --group-family   # 同设计多 seed → mean±std
+python tools/compare_models.py --family <config_hash> --group-family   # same design, multiple seeds -> mean±std
 ```
 
-`--summary` 输出紧凑排名表；默认输出宏观指标表 + 逐数据集 nCRPS/nMAE 表 + 逐时长 nCRPS，每列 ` <--` 标注该行最优。
+`--summary` prints a compact ranking table; the default output prints the macro
+metric table + per-dataset nCRPS/nMAE tables + per-horizon nCRPS, marking each
+row's best value with ` <--`.
 
-## 5. 导出论文表
+## 5. Export paper table
 
 ```bash
 python tools/export_report.py --format latex    --out results_table.tex
@@ -223,7 +233,8 @@ python tools/export_report.py --format markdown --variant small,base,large
 python tools/export_report.py --format csv      --all --out results_table.csv
 ```
 
-LaTeX 输出为 booktabs 表格（`\toprule`/`\midrule`/`\bottomrule`），最优值自动 `\textbf{}` 加粗。
+The LaTeX output is a booktabs table (`\toprule`/`\midrule`/`\bottomrule`) with
+the best value bolded via `\textbf{}`.
 
 ## 6. Seed sweep
 
@@ -232,30 +243,39 @@ python tools/run_seed_sweep.py --model small --seeds 42,43,44 --dry-run
 python tools/run_seed_sweep.py --model base  --seeds 42,43,44
 ```
 
-每个 seed 提交一个独立训练（`DEEPWIND_RUN_NAME=deepwind-<model>-paper-seed<s>`，
-`DEEPWIND_TRAIN_OVERRIDES=seed=<s>` 走 Hydra 顶层 `seed` override，`train.py` 里
-`set_seed(cfg.seed)` 会用它重设模型初始化 / 数据顺序 / RNG）。
+Each seed submits an independent training run (`DEEPWIND_RUN_NAME=deepwind-<model>-paper-seed<s>`,
+`DEEPWIND_TRAIN_OVERRIDES=seed=<s>` — a Hydra top-level `seed` override that
+`train.py` applies via `set_seed(cfg.seed)` to re-seed model init / data order /
+RNG).
 
-每个 seed 训完→评估→`register_eval.py` 注册；因 `config_hash` 不含 seed，多 seed 自动归组，
-`compare_models.py --group-family` 可直接出 mean±std。
+After each seed finishes training → evaluate → `register_eval.py`. Because
+`config_hash` excludes the seed, the seeds group automatically, and
+`compare_models.py --group-family` gives mean±std directly.
 
-> 已知限制：`train_paper.sbatch` 里 `wandb.tags=[...,seed42]` 是写死的，seed sweep 的 wandb tag
-> 仍显示 `seed42`；真实 seed 以排行榜 `seed` 字段与 `wandb.notes`/`run_name` 为准。
+> Known limitation: `train_paper.sbatch` hardcodes `wandb.tags=[...,seed42]`, so a
+> seed sweep's wandb tag still reads `seed42`; the true seed is the leaderboard's
+> `seed` field and `wandb.notes`/`run_name`.
 
-## 7. config_hash 语义
+## 7. config_hash semantics
 
 ```
 config_hash = sha256( canonical_json({ model, training', data', data_eval }) )
 ```
 
-其中从 `training` 剔除 **run 身份字段**（`run_name`/`output_dir`/`report_to`/`overwrite_output_dir`）
-与 **汇报/checkpoint 旋钮**（`logging_*`、`save_*`、`eval_*`、`load_best_model_at_end`、
-`ddp_find_unused_parameters`、`prediction_loss_only` 等），并从 `data` 剔除 `seed`。
-**seed 不参与哈希** → 同设计不同 seed 得到相同 `config_hash`，归为同一 family。
+From `training` we strip the **run identity fields** (`run_name` / `output_dir` /
+`report_to` / `overwrite_output_dir`) and the **reporting/checkpoint knobs**
+(`logging_*`, `save_*`, `eval_*`, `load_best_model_at_end`,
+`ddp_find_unused_parameters`, `prediction_loss_only`, etc.), and we strip `seed`
+from `data`. **The seed never participates in the hash** → the same design with
+different seeds yields the same `config_hash` and groups as one family.
 
-## 8. 复用与边界
+## 8. Reuse & boundaries
 
-- 本体系**只读** `run_info.json`，不重复采集 provenance（`src/utils/provenance.py` 已做）。
-- `reproduction/` 里既有的论文图表脚本（reliability / coverage / efficiency）继续读
-  `<eval>/<dataset>/H_*.json`，与本体系**互补不冲突**——本体系是它们的上游（注册表/对比/论文表）。
-- 排行榜存**绝对 /scratch 路径**（诚实、可直接复现），通过 `DEEPWIND_RUNS_ROOT` 重定向。
+- These tools **only read** `run_info.json`; they do not re-collect provenance
+  (`src/utils/provenance.py` already does that).
+- The existing paper figure/table scripts in `reproduction/` (reliability /
+  coverage / efficiency) keep reading `<eval>/<dataset>/H_*.json`; this system is
+  complementary, not a replacement — it is their upstream (registry / comparison
+  / paper table).
+- The leaderboard stores **absolute /scratch paths** (honest and directly
+  reproducible), redirectable via `DEEPWIND_RUNS_ROOT`.

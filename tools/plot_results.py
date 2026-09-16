@@ -68,6 +68,16 @@ def _variant_legend_handles(rows):
     return [mpatches.Patch(color=c, label=v) for v, c in seen.items()]
 
 
+def _legend(ax, handles=None, ncol=1):
+    """Pin the legend right of the axes so it can never cover bars or lines.
+
+    ``savefig.bbox="tight"`` (set in ``_set_style``) grows the canvas to
+    include the legend, so no manual margin bookkeeping is required here.
+    """
+    return ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(1.02, 1.0),
+                     frameon=False, handlelength=1.2, borderaxespad=0.0, ncol=ncol)
+
+
 def _set_style():
     plt.rcParams.update({
         "savefig.bbox": "tight",
@@ -130,7 +140,7 @@ def _plot_ranking(rows, out, formats):
     ax.set_title("Model ranking by mean nCRPS")
     handles = _variant_legend_handles(order)
     if handles:
-        ax.legend(handles=handles, loc="lower right")
+        _legend(ax, handles=handles)
     return _save(fig, out / "ranking_ncrps", formats)
 
 
@@ -196,7 +206,7 @@ def _plot_per_dataset(rows, out, formats):
     ax.set_ylabel("nCRPS (lower is better)")
     ax.set_title("Per-dataset nCRPS (mean over horizons)")
     if n > 1:
-        ax.legend()
+        _legend(ax)
     return _save(fig, out / "per_dataset_ncrps", formats)
 
 
@@ -222,7 +232,7 @@ def _plot_per_horizon(rows, out, formats):
     ax.set_ylabel("nCRPS (lower is better)")
     ax.set_title("Per-horizon nCRPS (mean over datasets)")
     if len(order) > 1:
-        ax.legend()
+        _legend(ax)
     return _save(fig, out / "per_horizon_ncrps", formats)
 
 
@@ -253,7 +263,7 @@ def _plot_seed_sweep(rows, out, formats):
         ax.set_xlabel("Forecast horizon")
         ax.set_ylabel("nCRPS (lower is better)")
         ax.set_title(f"Seed sweep — {label} (config_hash {chash[:8]})")
-        ax.legend()
+        _legend(ax)
         written += _save(fig, out / f"seed_sweep_{label}", formats)
     return written
 

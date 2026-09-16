@@ -70,7 +70,7 @@ def _load_manifest(path):
     p = Path(path)
     if p.exists():
         return json.loads(p.read_text(encoding="utf-8"))
-    return {"seed": None, "samples": {}, "rolling": {}}
+    return {"seed": None, "rolling": {}}
 
 
 def _save_manifest(path, m):

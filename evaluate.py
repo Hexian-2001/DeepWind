@@ -57,10 +57,19 @@ def _build_dataloader(
     """
     stride = cfg.data.get("stride", None) or pred_len
 
+    # Per-dataset context override (e.g. gefc12/gefc14 use 1024 instead of the
+    # model's 8192 so DeepWind is not disadvantaged on the short series).
+    dataset_name   = os.path.basename(npy_path).replace(".npy", "")
+    context_length = int(
+        cfg.data.get("context_length_override", {}).get(
+            dataset_name, cfg.data.context_length
+        )
+    )
+
     dataset = DeepWindTestDataset(
         npy_path          = npy_path,
         metadata_path     = cfg.data.metadata_path,
-        context_length    = cfg.data.context_length,
+        context_length    = context_length,
         prediction_length = pred_len,
         stride            = stride,
     )

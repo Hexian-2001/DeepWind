@@ -13,6 +13,13 @@ seed: 42
 data:
   metadata_path: "${oc.env:DEEPWIND_DATA_ROOT}/test_metadata.csv"
   context_length: 8192
+  # Per-dataset context override. On the short series gefc12_wind_7 and
+  # gefc14_wind_10 a full 8192-step context reaches back ~half the series and
+  # disadvantages DeepWind versus the 1024-step baselines, so these two use
+  # 1024 (matching the baselines). Every other dataset keeps 8192.
+  context_length_override:
+    gefc12_wind_7: 1024
+    gefc14_wind_10: 1024
   stride: null
   test_npy_paths:
     - "${oc.env:DEEPWIND_DATA_ROOT}/test/30651.npy"

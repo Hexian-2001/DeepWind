@@ -27,7 +27,7 @@ deepwindData/
 
 | Task | Script | Config | Setonix launcher |
 |---|---|---|---|
-| Pretrain | `train.py` | `configs/train.yaml` + `configs/training/deepwind_{small,base,large}.yaml` | `scripts/setonix/train_paper.sbatch` (`MODEL=small\|base\|large`) |
+| Pretrain | `train.py` | `configs/train.yaml` + `configs/training/deepwind_{small,base,large}.yaml` | `scripts/setonix/train_paper.sbatch` (24h `gpu`, auto-requeue) / `train_paper_dev.sbatch` (3h50m `gpu-dev`, chunked) |
 | Finetune | `finetune.py` | `configs/finetune.yaml` + `configs/training/finetune.yaml` | — (run directly) |
 | Inference | `infer.py` | `configs/infer.yaml` | — (run directly) |
 | Evaluate | `evaluate.py` | `configs/eval.yaml` | `scripts/setonix/eval_paper.sbatch` |
@@ -178,8 +178,8 @@ finished training run), repeat these 5 steps. All commands run from the repo roo
 **Step 1 — Evaluate** (skip if already evaluated; `CKPT` points at the training
 run's `checkpoints` directory)
 ```bash
-CKPT=/scratch/pawsey0115/hwang4/projects/deepwind/runs/DeepWind-Research/deepwind-small-paper-seed42/checkpoints
-sbatch --export=ALL,MODEL=small,CKPT=${CKPT},EVAL_NAME=eval-small-paper scripts/setonix/eval_paper.sbatch
+CKPT=/scratch/pawsey0115/hwang4/projects/deepwind/runs/DeepWind-Research/deepwind-small-paper-seed42-20260914-164253/checkpoints   # the trained run's checkpoints dir
+sbatch --export=ALL,MODEL=small,CKPT=${CKPT},EVAL_NAME=eval-small-paper scripts/setonix/eval_paper.sbatch   # submit the eval job
 # after the eval job reaches COMPLETED in squeue, aggregate:
 "$PY" tools/aggregate_eval.py \
   /scratch/pawsey0115/hwang4/projects/deepwind/runs/results/deepwind/eval-small-paper
@@ -189,19 +189,19 @@ sbatch --export=ALL,MODEL=small,CKPT=${CKPT},EVAL_NAME=eval-small-paper scripts/
 ```bash
 "$PY" tools/register_eval.py \
   /scratch/pawsey0115/hwang4/projects/deepwind/runs/results/deepwind/eval-small-paper \
-  --model-id deepwind-small-paper-seed42 --variant small --tags paper-spec,baseline,seed42
+  --model-id deepwind-small-paper-seed42 --variant small --tags paper-spec,baseline,seed42   # writes one row to results/leaderboard.jsonl
 ```
 
 **Step 3 — Quick ranking** (which model looks best, at a glance)
 ```bash
 "$PY" tools/compare_models.py --summary                    # all models, sorted by nCRPS ascending
-"$PY" tools/compare_models.py --summary --variant small,base,large
+"$PY" tools/compare_models.py --summary --variant small,base,large   # only the DeepWind variants
 "$PY" tools/compare_models.py --summary --csv ranking.csv  # export as CSV (open in Excel)
 ```
 
 **Step 4 — Detailed comparison** (per-dataset / per-horizon, to locate the gap)
 ```bash
-"$PY" tools/compare_models.py --variant small,base,large
+"$PY" tools/compare_models.py --variant small,base,large               # full per-dataset / per-horizon breakdown
 "$PY" tools/compare_models.py --family <config_hash> --group-family   # same design, multiple seeds -> mean±std
 ```
 
@@ -247,19 +247,43 @@ train (train_paper.sbatch)
 ### 2.1 Train
 
 ```bash
-MODEL=small sbatch --export=ALL,MODEL=small scripts/setonix/train_paper.sbatch
+# 24h job on `gpu` (4 nodes x 8 GPUs = 32 GPUs); --requeue auto-resumes at the wall-clock limit
+sbatch --export=ALL,MODEL=small scripts/setonix/train_paper.sbatch
 ```
 
-The run name is fixed to `deepwind-small-paper-seed42` (a `--requeue` reuses the
+The run name is fixed to `deepwind-<model>-paper-seed42` (a `--requeue` reuses the
 same `output_dir`, so training auto-resumes across the 24h wall-clock limit).
+
+#### 2.1.1 Train on `gpu-dev` (chunked, when `gpu` is drained)
+
+When the main `gpu` partition is backfilled/drained (`QOS=exhausted`, 0 idle
+nodes), train in manual 3h50m chunks on `gpu-dev` (its `MaxNodes=2`, so 2 x 8 =
+16 GPUs per job):
+
+```bash
+# one 3h50m chunk; no auto-requeue — it ends at wall-clock and the next chunk resumes from the last checkpoint
+sbatch --export=ALL,MODEL=base scripts/setonix/train_paper_dev.sbatch
+# chain N chunks back-to-back (afterany); --begin HH:MM delays the FIRST chunk
+scripts/setonix/submit_train_chunks.sh base 1                 # submit 1 chunk
+scripts/setonix/submit_train_chunks.sh base 3 --begin 03:30   # 3 chunks, first starts after 03:30
+```
+
+`train_paper_dev.sbatch` keeps the paper-exact **global batch 256** by doubling
+gradient accumulation — Base/Large run `per_device=4 x accum=4 x 16 GPUs` (vs the
+paper's `4 x 2 x 32`), Small `8 x 2` — so the model sees identical data. It also
+lowers `save_steps` 5000 → 1000 so a short chunk can't be lost. The fixed run
+name (`deepwind-<model>-paper-seed42`) + `_detect_checkpoint` make each new chunk
+auto-resume from the last checkpoint. See the script headers for the full
+per-model mapping and the `submit_train_chunks.sh` usage.
 
 ### 2.2 Evaluate
 
 ```bash
-CKPT=/scratch/pawsey0115/hwang4/projects/deepwind/runs/DeepWind-Research/deepwind-small-paper-seed42/checkpoints
-sbatch --export=ALL,MODEL=small,CKPT=... scripts/setonix/eval_paper.sbatch
-# after completion:
-"$PY" tools/aggregate_eval.py <eval_dir>
+# point CKPT at the training run's checkpoints dir, then submit the eval job
+CKPT=/scratch/pawsey0115/hwang4/projects/deepwind/runs/DeepWind-Research/deepwind-small-paper-seed42-20260914-164253/checkpoints
+sbatch --export=ALL,MODEL=small,CKPT=${CKPT},EVAL_NAME=eval-small-paper scripts/setonix/eval_paper.sbatch
+# after the eval job reaches COMPLETED in squeue, macro-average the metrics:
+"$PY" tools/aggregate_eval.py /scratch/pawsey0115/hwang4/projects/deepwind/runs/results/deepwind/eval-small-paper
 ```
 
 ### 2.3 Data protocol (unified target grid)
@@ -292,7 +316,7 @@ and the full ranked comparison table.
 ```bash
 "$PY" tools/register_eval.py \
   /scratch/pawsey0115/hwang4/projects/deepwind/runs/results/deepwind/eval-small-paper \
-  --model-id deepwind-small-paper-seed42 --variant small --tags paper-spec,baseline,seed42
+  --model-id deepwind-small-paper-seed42 --variant small --tags paper-spec,baseline,seed42   # writes one row to results/leaderboard.jsonl
 ```
 
 `register_eval.py` automatically reads:
@@ -348,9 +372,9 @@ winner automatically):
 ```bash
 "$PY" tools/compare_models.py --summary                       # quick ranking (one line per model, nCRPS ascending)
 "$PY" tools/compare_models.py --summary --csv ranking.csv     # ranking as CSV
-"$PY" tools/compare_models.py --all
-"$PY" tools/compare_models.py --variant small,base,large
-"$PY" tools/compare_models.py deepwind-small-paper-seed42 deepwind-base-paper-seed42
+"$PY" tools/compare_models.py --all                           # every registered model
+"$PY" tools/compare_models.py --variant small,base,large      # only the DeepWind variants
+"$PY" tools/compare_models.py deepwind-small-paper-seed42 deepwind-base-paper-seed42   # two specific models head-to-head
 "$PY" tools/compare_models.py --family <config_hash> --group-family   # same design, multiple seeds -> mean±std
 ```
 
@@ -361,9 +385,9 @@ row's best value with ` <--`.
 ## 5. Export paper table
 
 ```bash
-"$PY" tools/export_report.py --format latex    --out results_table.tex
-"$PY" tools/export_report.py --format markdown --variant small,base,large
-"$PY" tools/export_report.py --format csv      --all --out results_table.csv
+"$PY" tools/export_report.py --format latex    --out results_table.tex        # LaTeX booktabs table (for the paper)
+"$PY" tools/export_report.py --format markdown --variant small,base,large      # markdown, variants only
+"$PY" tools/export_report.py --format csv      --all --out results_table.csv   # CSV, all models
 ```
 
 The LaTeX output is a booktabs table (`\toprule`/`\midrule`/`\bottomrule`) with
@@ -373,8 +397,8 @@ the best value bolded via `\textbf{}`.
 
 ```bash
 "$PY" tools/plot_results.py                            # all models -> reports/figures/
-"$PY" tools/plot_results.py --variant small,base,large
-"$PY" tools/plot_results.py --formats png,svg --dpi 200
+"$PY" tools/plot_results.py --variant small,base,large              # variants only
+"$PY" tools/plot_results.py --formats png,svg --dpi 200             # output PNG + SVG at 200 DPI
 ```
 
 `plot_results.py` renders publication-quality figures from the leaderboard into
@@ -399,9 +423,9 @@ JSONL stays the committed source of truth, and `reports/` is git-ignored
 ### 6.1 Rolling (stitched) forecast visualisations
 
 ```bash
-"$PY" tools/plot_rolling_forecasts.py --model-id deepwind-small-paper-seed42
-"$PY" tools/plot_rolling_forecasts.py --model-id deepwind-base-paper-seed42 --steps 128
-"$PY" tools/plot_rolling_forecasts.py --model-id deepwind-base-paper-seed42 --steps 256 --num-plots 3
+"$PY" tools/plot_rolling_forecasts.py --model-id deepwind-small-paper-seed42                  # default (128 steps, 3 segments)
+"$PY" tools/plot_rolling_forecasts.py --model-id deepwind-base-paper-seed42 --steps 128        # fixed 128-step panels
+"$PY" tools/plot_rolling_forecasts.py --model-id deepwind-base-paper-seed42 --steps 256 --num-plots 3   # longer panels, 3 segments
 ```
 
 A single window is hard to judge in isolation (for 60-min data H1 is *one* step), so
@@ -437,8 +461,8 @@ model plots the *same* contiguous blocks.
 ## 7. Seed sweep
 
 ```bash
-"$PY" tools/run_seed_sweep.py --model small --seeds 42,43,44 --dry-run
-"$PY" tools/run_seed_sweep.py --model base  --seeds 42,43,44
+"$PY" tools/run_seed_sweep.py --model small --seeds 42,43,44 --dry-run   # preview the sbatch commands only
+"$PY" tools/run_seed_sweep.py --model base  --seeds 42,43,44             # actually submit 3 training runs
 ```
 
 Each seed submits an independent training run (`DEEPWIND_RUN_NAME=deepwind-<model>-paper-seed<s>`,

@@ -38,7 +38,7 @@ deepwindData/
 |---|---|
 | `src/models/` | `deepwind.py`, `backbone.py`, `configuration.py`, `adapter.py`, `layers.py` |
 | `src/data/` | datasets & dataloaders |
-| `src/evaluation/` | eval metrics & harness |
+| `src/evaluation/` | eval protocol (`protocol.py`), metrics & harness |
 | `src/inference/` | inference helpers |
 | `src/losses/` | losses (CRPS / quantile) |
 | `src/layers/` | Transformer building blocks |
@@ -263,7 +263,32 @@ sbatch --export=ALL,MODEL=small,CKPT=... scripts/setonix/eval_paper.sbatch
 "$PY" tools/aggregate_eval.py <eval_dir>
 ```
 
-### 2.3 Register
+### 2.3 Data protocol (unified target grid)
+
+Every model — DeepWind and every baseline — is scored on the **same test
+targets**, produced by `src/evaluation/protocol.py`:
+
+- `test_target_starts(T, pred_len, train_ratio=0.7, val_ratio=0.1)` returns the
+  non-overlapping target start indices over the test slice, anchored at
+  `t_val = int(T * (train_ratio + val_ratio))` (= `0.8T`).
+- `make_windows(series, target_starts, ctx, pred_len)` builds each (input,
+  target) pair as `X = series[s-ctx:s]`, `y = series[s:s+pred_len]`.
+
+The targets are therefore byte-identical across models; only `ctx` (the lookback
+context length) is a per-model choice.
+
+**Context length.** DeepWind's default `context_length` is 8192. On the two short
+series — `gefc12_wind_7` (T = 18,756) and `gefc14_wind_10` (T = 16,800) — a full
+8192-step context reaches back roughly half the series and disadvantages DeepWind
+against the 1024-step baselines, so these two use `context_length = 1024` via
+`configs/eval.yaml` `data.context_length_override` (resolved per dataset in
+`evaluate.py::_build_dataloader`). Every other dataset keeps 8192.
+
+The baseline models (statistical / gradient-boosted / deep-learning / TSFMs) run
+on the identical protocol and windowing — see `docs/baselines.md` for the harness
+and the full ranked comparison table.
+
+### 2.4 Register
 
 ```bash
 "$PY" tools/register_eval.py \
@@ -301,9 +326,9 @@ Each line of `results/leaderboard.jsonl` is one JSON object:
   "seed": 42,
   "data_seed": null,
   "metrics": {
-    "mean": { "nCRPS": 0.1121, "nMAE": 0.1482, "Accuracy": 0.7814,
-              "Qualified_Rate": 0.7327, "MAE_Coverage": 0.1085, "R2": 0.5268,
-              "mean_wQuantileLoss": 0.3120 },
+    "mean": { "nCRPS": 0.1097, "nMAE": 0.1453, "Accuracy": 0.7838,
+              "Qualified_Rate": 0.7403, "MAE_Coverage": 0.1082, "R2": 0.5453,
+              "mean_wQuantileLoss": 0.3064 },
     "per_dataset": { "30651": { "nCRPS": 0.1083, "…": "…" }, "…": "…" },
     "per_horizon_nCRPS": { "nCRPS_H1": 0.0567, "…": "…" },
     "n_cells": 48

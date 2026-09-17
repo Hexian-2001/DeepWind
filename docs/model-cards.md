@@ -1,13 +1,16 @@
 # Model cards
 
-**Contents**
+<details>
+<summary>Contents</summary>
 
-- 1. DeepWind variants
-  - 1.1. deepwind-small
-  - 1.2. deepwind-base
-  - 1.3. deepwind-large
-- 2. Baselines
-- 3. Leaderboard snapshot
+- [1. DeepWind variants](#1-deepwind-variants)
+  - [1.1. deepwind-small](#11-deepwind-small)
+  - [1.2. deepwind-base](#12-deepwind-base)
+  - [1.3. deepwind-large](#13-deepwind-large)
+- [2. Baselines](#2-baselines)
+- [3. Leaderboard snapshot](#3-leaderboard-snapshot)
+
+</details>
 
 Quick reference for every model on the leaderboard: architecture, parameter
 count, model hyperparameters, and training hyperparameters. Authoritative

@@ -1,34 +1,37 @@
 # Reproducibility record
 
-**Contents**
+<details>
+<summary>Contents</summary>
 
-- 1. Project map — where everything lives
-  - 1.1. Repo, environment & data
-  - 1.2. Entry-point scripts
-  - 1.3. Source (`src/`)
-  - 1.4. Configs (`configs/`)
-  - 1.5. Model weights (checkpoints)
-  - 1.6. Experiment records
-  - 1.7. Tooling (`tools/`) & docs
-- 2. Published specification
-- 3. Recovered final run
-- 4. Provenance requirements for every new run
-- 5. Step-by-step quick start
-- 6. Concept
-- 7. Pipeline
-  - 7.1. Train
-    - 7.1.1. Train on `gpu-dev` (chunked, when `gpu` is drained)
-  - 7.2. Evaluate
-  - 7.3. Data protocol (unified target grid)
-  - 7.4. Register
-- 8. Leaderboard schema
-- 9. Compare
-- 10. Export paper table
-- 11. Visualize (figures)
-  - 11.1. Rolling (stitched) forecast visualisations
-- 12. Seed sweep
-- 13. config_hash semantics
-- 14. Reuse & boundaries
+- [1. Project map — where everything lives](#1-project-map--where-everything-lives)
+  - [1.1. Repo, environment & data](#11-repo-environment--data)
+  - [1.2. Entry-point scripts](#12-entry-point-scripts)
+  - [1.3. Source (`src/`)](#13-source-src)
+  - [1.4. Configs (`configs/`)](#14-configs-configs)
+  - [1.5. Model weights (checkpoints)](#15-model-weights-checkpoints)
+  - [1.6. Experiment records](#16-experiment-records)
+  - [1.7. Tooling (`tools/`) & docs](#17-tooling-tools--docs)
+- [2. Published specification](#2-published-specification)
+- [3. Recovered final run](#3-recovered-final-run)
+- [4. Provenance requirements for every new run](#4-provenance-requirements-for-every-new-run)
+- [5. Step-by-step quick start](#5-step-by-step-quick-start)
+- [6. Concept](#6-concept)
+- [7. Pipeline](#7-pipeline)
+  - [7.1. Train](#71-train)
+    - [7.1.1. Train on `gpu-dev` (chunked, when `gpu` is drained)](#711-train-on-gpu-dev-chunked-when-gpu-is-drained)
+  - [7.2. Evaluate](#72-evaluate)
+  - [7.3. Data protocol (unified target grid)](#73-data-protocol-unified-target-grid)
+  - [7.4. Register](#74-register)
+- [8. Leaderboard schema](#8-leaderboard-schema)
+- [9. Compare](#9-compare)
+- [10. Export paper table](#10-export-paper-table)
+- [11. Visualize (figures)](#11-visualize-figures)
+  - [11.1. Rolling (stitched) forecast visualisations](#111-rolling-stitched-forecast-visualisations)
+- [12. Seed sweep](#12-seed-sweep)
+- [13. config_hash semantics](#13-config_hash-semantics)
+- [14. Reuse & boundaries](#14-reuse--boundaries)
+
+</details>
 
 ## 1. Project map — where everything lives
 

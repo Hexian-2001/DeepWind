@@ -1,19 +1,22 @@
 # DeepWind Engineering Refactor Roadmap
 
-**Contents**
+<details>
+<summary>Contents</summary>
 
-- 1. Guiding principles
-- 2. Standard environment variables
-- 3. Phase 0 — Environment (point 8) — *done*
-- 4. Phase 1 — Internationalise to English (point 9)
-- 5. Phase 2 — Packaging hygiene (industrial-grade)
-- 6. Phase 3 — De-hardcode paths (points 3, 6)
-- 7. Phase 4 — Finetune entry-point refactor (points 4, 5)
-- 8. Phase 5 — User-facing inference CLI (point 4)
-- 9. Phase 6 — Provenance & experiment standards (point 5)
-- 10. Phase 7 — Data hygiene (points 3, 6)
-- 11. Phase 8 — Scratch path standardisation & de-dup (point 6)
-- 12. Phase 9 — Security & release (point 7)
+- [1. Guiding principles](#1-guiding-principles)
+- [2. Standard environment variables](#2-standard-environment-variables)
+- [3. Phase 0 — Environment (point 8) — *done*](#3-phase-0--environment-point-8--done)
+- [4. Phase 1 — Internationalise to English (point 9)](#4-phase-1--internationalise-to-english-point-9)
+- [5. Phase 2 — Packaging hygiene (industrial-grade)](#5-phase-2--packaging-hygiene-industrial-grade)
+- [6. Phase 3 — De-hardcode paths (points 3, 6)](#6-phase-3--de-hardcode-paths-points-3-6)
+- [7. Phase 4 — Finetune entry-point refactor (points 4, 5)](#7-phase-4--finetune-entry-point-refactor-points-4-5)
+- [8. Phase 5 — User-facing inference CLI (point 4)](#8-phase-5--user-facing-inference-cli-point-4)
+- [9. Phase 6 — Provenance & experiment standards (point 5)](#9-phase-6--provenance--experiment-standards-point-5)
+- [10. Phase 7 — Data hygiene (points 3, 6)](#10-phase-7--data-hygiene-points-3-6)
+- [11. Phase 8 — Scratch path standardisation & de-dup (point 6)](#11-phase-8--scratch-path-standardisation--de-dup-point-6)
+- [12. Phase 9 — Security & release (point 7)](#12-phase-9--security--release-point-7)
+
+</details>
 
 > Status: **in progress** — phases are executed top-to-bottom; each phase is
 > independently committable and does not change model/training/inference *logic*.

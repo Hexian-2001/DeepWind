@@ -1,11 +1,14 @@
 # Data
 
-**Contents**
+<details>
+<summary>Contents</summary>
 
-- 1. Expected processed layout
-- 2. Corpus and sampling
-- 3. Split isolation
-- 4. Redistribution
+- [1. Expected processed layout](#1-expected-processed-layout)
+- [2. Corpus and sampling](#2-corpus-and-sampling)
+- [3. Split isolation](#3-split-isolation)
+- [4. Redistribution](#4-redistribution)
+
+</details>
 
 ## 1. Expected processed layout
 

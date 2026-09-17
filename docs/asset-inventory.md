@@ -1,8 +1,11 @@
 # Pawsey asset inventory
 
-**Contents**
+<details>
+<summary>Contents</summary>
 
-- 1. De-duplication candidate (no deletion performed)
+- [1. De-duplication candidate (no deletion performed)](#1-de-duplication-candidate-no-deletion-performed)
+
+</details>
 
 The metadata-only inventory generated on 2026-09-14 is stored outside the public
 repository at:

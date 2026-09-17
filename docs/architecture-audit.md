@@ -1,11 +1,14 @@
 # Architecture and reproducibility audit
 
-**Contents**
+<details>
+<summary>Contents</summary>
 
-- 1. Confirmed implementation
-- 2. Material provenance differences
-- 3. Issues found and disposition
-- 4. Gates before full retraining
+- [1. Confirmed implementation](#1-confirmed-implementation)
+- [2. Material provenance differences](#2-material-provenance-differences)
+- [3. Issues found and disposition](#3-issues-found-and-disposition)
+- [4. Gates before full retraining](#4-gates-before-full-retraining)
+
+</details>
 
 This audit distinguishes three targets: the Energy paper, the configuration
 stored with `deepwind_large_v5`, and the repository defaults. They must not be

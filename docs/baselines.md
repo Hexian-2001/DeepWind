@@ -1,15 +1,18 @@
 # Baselines & Model Comparison
 
-**Contents**
+<details>
+<summary>Contents</summary>
 
-- 1. Model taxonomy
-- 2. Data protocol (identical for every model)
-- 3. Metrics
-- 4. Small-model hyperparameters
-- 5. Results
-- 6. Takeaway
-- 7. Reproduce
-- 8. Register into the leaderboard
+- [1. Model taxonomy](#1-model-taxonomy)
+- [2. Data protocol (identical for every model)](#2-data-protocol-identical-for-every-model)
+- [3. Metrics](#3-metrics)
+- [4. Small-model hyperparameters](#4-small-model-hyperparameters)
+- [5. Results](#5-results)
+- [6. Takeaway](#6-takeaway)
+- [7. Reproduce](#7-reproduce)
+- [8. Register into the leaderboard](#8-register-into-the-leaderboard)
+
+</details>
 
 This document records the comparison models evaluated against DeepWind on the
 8 WindBench test datasets × 6 horizons, how they were trained/evaluated, and

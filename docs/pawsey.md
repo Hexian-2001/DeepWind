@@ -1,9 +1,12 @@
 # Pawsey Setonix workflow
 
-**Contents**
+<details>
+<summary>Contents</summary>
 
-- 1. Production training
-- 2. Watching training with wandb
+- [1. Production training](#1-production-training)
+- [2. Watching training with wandb](#2-watching-training-with-wandb)
+
+</details>
 
 Keep Git repositories and environments under `/software/projects`, and keep
 large datasets, checkpoints, logs, W&B caches, and temporary outputs under

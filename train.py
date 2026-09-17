@@ -29,7 +29,7 @@ from src.utils.trainer import DeepWindTrainer
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Graceful shutdown on SIGTERM (preemption / wall-clock kill)
+# Graceful shutdown on SIGTERM / SIGUSR1 (preemption / wall-clock kill)
 # ---------------------------------------------------------------------------
 # Slurm sends SIGTERM when a job hits its wall-clock limit or is preempted.
 # HuggingFace Trainer does NOT save on SIGTERM by default, so we record the
@@ -259,9 +259,13 @@ def main(cfg: DictConfig) -> None:
         data_collator=default_data_collator,
     )
 
-    # 5b. Graceful shutdown: save + stop at the next step boundary on SIGTERM.
+    # 5b. Graceful shutdown: save + stop at the next step boundary on SIGTERM
+    #     (Slurm wall-clock kill) or SIGUSR1 (Slurm `--signal=SIGUSR1@N`, which
+    #     torchrun's elastic agent does NOT trap, so the worker keeps the full
+    #     grace window instead of torchrun's hardcoded 30s close() timeout).
     trainer.add_callback(_GracefulSaveCallback())
     signal.signal(signal.SIGTERM, _request_shutdown)
+    signal.signal(signal.SIGUSR1, _request_shutdown)
 
     # 6. Synchronise all ranks before training begins
     if dist.is_available() and dist.is_initialized():

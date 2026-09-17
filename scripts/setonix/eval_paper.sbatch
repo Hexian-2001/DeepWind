@@ -1,4 +1,6 @@
 #!/bin/bash --login
+#SBATCH --output=/scratch/pawsey0115/hwang4/projects/deepwind/runs/slurm-logs/%x-%j.out
+#SBATCH --error=/scratch/pawsey0115/hwang4/projects/deepwind/runs/slurm-logs/%x-%j.err
 #SBATCH --job-name=dw-eval
 #SBATCH --partition=gpu
 #SBATCH --nodes=1

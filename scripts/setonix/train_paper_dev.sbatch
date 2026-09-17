@@ -1,4 +1,6 @@
 #!/bin/bash --login
+#SBATCH --output=/scratch/pawsey0115/hwang4/projects/deepwind/runs/slurm-logs/%x-%j.out
+#SBATCH --error=/scratch/pawsey0115/hwang4/projects/deepwind/runs/slurm-logs/%x-%j.err
 #SBATCH --job-name=dw-paper-dev
 #SBATCH --partition=gpu-dev
 #SBATCH --nodes=2
@@ -83,6 +85,9 @@ export NCCL_DEBUG=WARN
 export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
 export WANDB_MODE=online
 export WANDB_DIR="${run_dir}/wandb"
+export WANDB_CONFIG_DIR="${DEEPWIND_RUNS_ROOT}/.wandb/config"
+export WANDB_CACHE_DIR="${DEEPWIND_RUNS_ROOT}/.wandb/cache"
+export WANDB_DATA_DIR="${DEEPWIND_RUNS_ROOT}/.wandb/data"
 
 # Paper-exact global batch 256, peak LR 1e-4, warmup 3%, cosine, grad clip 1.0,
 # BF16, 100k steps -- identical data/trajectory to the 32-GPU run.

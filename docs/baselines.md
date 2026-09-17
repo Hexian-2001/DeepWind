@@ -1,7 +1,6 @@
 # Baselines & Model Comparison
 
-<details>
-<summary>Contents</summary>
+## Contents
 
 - [1. Model taxonomy](#1-model-taxonomy)
 - [2. Data protocol (identical for every model)](#2-data-protocol-identical-for-every-model)
@@ -12,7 +11,6 @@
 - [7. Reproduce](#7-reproduce)
 - [8. Register into the leaderboard](#8-register-into-the-leaderboard)
 
-</details>
 
 This document records the comparison models evaluated against DeepWind on the
 8 WindBench test datasets × 6 horizons, how they were trained/evaluated, and
@@ -146,5 +144,4 @@ python tools/register_baselines.py \
 
 ---
 
-**Related docs:** [Architecture audit](architecture-audit.md) · [Asset inventory](asset-inventory.md) · [Data](data.md) · [Model cards](model-cards.md) · [Pawsey workflow](pawsey.md) · [Refactor roadmap](refactor-roadmap.md) · [Reproducibility record](reproducibility.md)
-
+**Related docs:** [Reproducibility record](reproducibility.md)

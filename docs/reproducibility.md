@@ -1,7 +1,6 @@
 # Reproducibility record
 
-<details>
-<summary>Contents</summary>
+## Contents
 
 - [1. Project map — where everything lives](#1-project-map--where-everything-lives)
   - [1.1. Repo, environment & data](#11-repo-environment--data)
@@ -30,8 +29,10 @@
 - [12. Seed sweep](#12-seed-sweep)
 - [13. config_hash semantics](#13-config_hash-semantics)
 - [14. Reuse & boundaries](#14-reuse--boundaries)
-
-</details>
+- [15. Data](#15-data)
+- [16. Model cards](#16-model-cards)
+- [17. Pawsey workflow & wandb](#17-pawsey-workflow--wandb)
+- [18. Release hardening status](#18-release-hardening-status)
 
 ## 1. Project map — where everything lives
 
@@ -130,9 +131,8 @@ Example (Small):
 | `run_seed_sweep.py` | submit multi-seed training |
 | `audit_data_splits.py` / `audit_dataset.py` / `clean_data_manifests.py` | data hygiene |
 
-Paper figure/table scripts live in `reproduction/`; longer docs in `docs/`
-(`architecture-audit.md`, `asset-inventory.md`, `data.md`, `pawsey.md`,
-`refactor-roadmap.md`).
+Paper figure/table scripts live in `reproduction/`; the comparison-model
+record is in `docs/baselines.md`.
 
 ## 2. Published specification
 
@@ -541,7 +541,118 @@ different seeds yields the same `config_hash` and groups as one family.
 - The leaderboard stores **absolute /scratch paths** (honest and directly
   reproducible), redirectable via `DEEPWIND_RUNS_ROOT`.
 
+## 15. Data
+
+### Corpus layout
+
+```text
+$DEEPWIND_DATA_ROOT/
+├── train/                 # one NumPy array per training series (127,297)
+├── eval/                  # held-out validation arrays
+├── test/                  # 8 WindBench benchmark arrays
+├── train_metadata.csv
+└── eval_metadata.csv
+```
+
+Each array is `float32` with shape `(variate, time)`. Metadata columns are
+`filename`, `latitude`, `longitude`, `variate_ids`, `dataset`. The loader pads
+heterogeneous inputs to `max_vars` and supplies a channel mask; instance
+normalisation is computed online per context window.
+
+### Corpus & sampling
+
+The paper reports ~562.4B observations from WIND Toolkit plus 19 additional
+sources, with source-level sampling weights 0.7 WIND Toolkit / 0.3 remaining
+SCADA, then adaptive per-file window counts with without-replacement cycles. The
+recovered training config predates the explicit `dataset_weights` fields, so
+reproduction must distinguish the published 0.7/0.3 spec, the recovered 2026 run,
+and the later experimental default (0.9/0.1 in `configs/data/train.yaml`).
+
+### Split isolation
+
+WindBench sites must not occur in pretraining. WIND Toolkit targets keep the
+paper's 10 km spatial exclusion buffer; SCADA sources exclude the exact held-out
+farm/turbine before window generation. A future public preprocessing release must
+emit a machine-readable split manifest and contamination audit.
+
+### Redistribution
+
+The 2.1 TB processed corpus is not redistributed; users obtain each source under
+its own terms (Shanxi Wind is proprietary). Release download/preprocessing scripts
+and checksums for public sources instead of derived data.
+
+## 16. Model cards
+
+| Field | small | base | large |
+|---|---|---|---|
+| Parameters (trainable) | 33.21 M | 888.24 M | ~1.3 B (est.) |
+| d_model / d_ff | 384 / 1024 | 1024 / 2816 | 1024 / 2816 |
+| Layers / heads | 6 / 6 | 12 / 16 | 18 / 16 |
+| Dropout | 0.05 | 0.05 | 0.1 |
+| Context length | 8192 | 8192 | 8192 |
+| Patch size / stride | 16 / 16 | 16 / 16 | 16 / 16 |
+| MoE | 4 experts, top-2 | 8 experts, top-2 | 8 experts, top-2 |
+| Variate attention | every 2 layers | every 2 layers | every 2 layers |
+| Positional | RoPE + xPos | RoPE + xPos | RoPE + xPos |
+| Norm / activation | RMSNorm / SiLU | RMSNorm / SiLU | RMSNorm / SiLU |
+| Prediction head | 21-quantile | 21-quantile | 21-quantile |
+
+Training (all variants): `lr` 1e-4 (cosine, warmup 3% = 3000 steps), 100k steps,
+global batch 256, Adam(0.9, 0.95), weight decay 0.01, grad clip 1.0, BF16.
+Small `8 x 1 x 32`; Base/Large `4 x 2 x 32` (the 16-GPU `gpu-dev` sbatch doubles
+accumulation to hold batch 256). Configs: `configs/model/deepwind_{size}.yaml` +
+`configs/training/deepwind_{size}.yaml`. See `docs/baselines.md` for the baseline
+model specs and the ranked comparison.
+
+## 17. Pawsey workflow & wandb
+
+| Variable | Default (Pawsey) |
+|---|---|
+| `DEEPWIND_PROJECT_ROOT` | `/software/projects/pawsey0115/hwang4/research_projects/DeepWind` |
+| `DEEPWIND_DATA_ROOT` | `/scratch/pawsey0115/hwang4/deepwindData` |
+| `DEEPWIND_RUNS_ROOT` | `/scratch/pawsey0115/hwang4/projects/deepwind/runs` |
+| `DEEPWIND_RESULTS_ROOT` | `/scratch/pawsey0115/hwang4/results/DeepWind-Research` |
+| `DEEPWIND_VENV` | `/scratch/pawsey0115/hwang4/conda_envs/deepwind` |
+
+Code/env on `/software`; datasets/checkpoints/logs/wandb caches on `/scratch`
+(`/software` has a 250k-inode quota, so the venv stays on `/scratch`). Run
+`scripts/setonix/smoke.sbatch` before scaling to production.
+
+```bash
+sbatch --export=ALL,MODEL=large scripts/setonix/train_paper.sbatch   # gpu: 4 nodes, 24h, auto-requeue
+scripts/setonix/submit_train_chunks.sh large 8                       # gpu-dev: chunked when gpu is drained
+```
+
+### Watching training with wandb
+
+Every run logs to the wandb project **`DeepWind-Research`** with a fixed run id
+equal to the run name (`deepwind-<model>-paper-seed42`); `wandb.init(id=…, resume="allow")`
+makes all chunks append to ONE server-side run.
+
+- Open the live run: the log prints `wandb run: <url>`.
+- **The `epoch` number resets each chunk — watch `step`, not `epoch`.** Training is
+  `max_steps=100000`; `global_step` (the x-axis) keeps growing across chunks.
+- **The local `wandb/` dir shows one `run-<timestamp>-<id>` per chunk** — that is
+  each chunk's on-disk cache, not separate runs.
+- Offline mode: set `WANDB_MODE=offline` in the sbatch, then
+  `wandb sync <run_dir>/wandb` from a login node.
+
+Slurm logs (`.out`/`.err`) and wandb config/cache are redirected to `/scratch`
+(every `scripts/setonix/*.sbatch` sets `--output`/`--error` plus
+`WANDB_CONFIG_DIR`/`WANDB_CACHE_DIR`), so **nothing is written to `$HOME`**.
+
+## 18. Release hardening status
+
+The open-source release hardening (Phases 0–9) is complete: self-hosted venv on
+`/scratch`, English comments, packaging hygiene, de-hardcoded paths, Hydra finetune
+entry point, `infer.py` CLI, `src/utils/provenance.py` run manifests, data-hygiene
+audits (7 leaked test files resolved, kept in `train/`), scratch path de-dup (the
+two ~80 GB `deepwind_large_v5` trees verified byte-identical and de-duplicated),
+and the plaintext HF token removed (rotation still required on huggingface.co).
+
+Remaining: push `release/open-source-v1` to GitHub (needs auth) and retrain
+Small/Base/Large to paper spec (RoPE+xPOS=true, λ=0.02) — in progress.
+
 ---
 
-**Related docs:** [Architecture audit](architecture-audit.md) · [Asset inventory](asset-inventory.md) · [Baselines & model comparison](baselines.md) · [Data](data.md) · [Model cards](model-cards.md) · [Pawsey workflow](pawsey.md) · [Refactor roadmap](refactor-roadmap.md)
-
+**Related docs:** [Baselines & model comparison](baselines.md)

@@ -1,31 +1,60 @@
 # Reproducibility record
 
-## Contents
+<details>
+<summary>Contents</summary>
 
-- [1. Project map — where everything lives](#1-project-map--where-everything-lives)
-  - [1.1. Repo, environment & data](#11-repo-environment--data)
-  - [1.2. Entry-point scripts](#12-entry-point-scripts)
-  - [1.3. Source (`src/`)](#13-source-src)
-  - [1.4. Configs (`configs/`)](#14-configs-configs)
-  - [1.5. Model weights (checkpoints)](#15-model-weights-checkpoints)
-  - [1.6. Experiment records](#16-experiment-records)
-  - [1.7. Tooling (`tools/`) & docs](#17-tooling-tools--docs)
+<details>
+<summary>1. Project map — where everything lives</summary>
+
+- [1.1. Repo, environment & data](#11-repo-environment--data)
+- [1.2. Entry-point scripts](#12-entry-point-scripts)
+- [1.3. Source (`src/`)](#13-source-src)
+- [1.4. Configs (`configs/`)](#14-configs-configs)
+- [1.5. Model weights (checkpoints)](#15-model-weights-checkpoints)
+- [1.6. Experiment records](#16-experiment-records)
+- [1.7. Tooling (`tools/`) & docs](#17-tooling-tools--docs)
+
+</details>
+
 - [2. Published specification](#2-published-specification)
 - [3. Recovered final run](#3-recovered-final-run)
 - [4. Provenance requirements for every new run](#4-provenance-requirements-for-every-new-run)
 - [5. Step-by-step quick start](#5-step-by-step-quick-start)
 - [6. Concept](#6-concept)
-- [7. Pipeline](#7-pipeline)
-  - [7.1. Train](#71-train)
-    - [7.1.1. Train on `gpu-dev` (chunked, when `gpu` is drained)](#711-train-on-gpu-dev-chunked-when-gpu-is-drained)
-  - [7.2. Evaluate](#72-evaluate)
-  - [7.3. Data protocol (unified target grid)](#73-data-protocol-unified-target-grid)
-  - [7.4. Register](#74-register)
-- [8. Leaderboard schema](#8-leaderboard-schema)
+
+<details>
+<summary>7. Pipeline</summary>
+
+<details>
+<summary>7.1. Train</summary>
+
+- [7.1.1. Train on `gpu-dev` (chunked, when `gpu` is drained)](#711-train-on-gpu-dev-chunked-when-gpu-is-drained)
+
+</details>
+
+- [7.2. Evaluate](#72-evaluate)
+- [7.3. Data protocol (unified target grid)](#73-data-protocol-unified-target-grid)
+- [7.4. Register](#74-register)
+
+</details>
+
+<details>
+<summary>8. Leaderboard schema</summary>
+
+- [8.1. Model card](#81-model-card)
+
+</details>
+
 - [9. Compare](#9-compare)
 - [10. Export paper table](#10-export-paper-table)
-- [11. Visualize (figures)](#11-visualize-figures)
-  - [11.1. Rolling (stitched) forecast visualisations](#111-rolling-stitched-forecast-visualisations)
+
+<details>
+<summary>11. Visualize (figures)</summary>
+
+- [11.1. Rolling (stitched) forecast visualisations](#111-rolling-stitched-forecast-visualisations)
+
+</details>
+
 - [12. Seed sweep](#12-seed-sweep)
 - [13. config_hash semantics](#13-config_hash-semantics)
 - [14. Reuse & boundaries](#14-reuse--boundaries)
@@ -33,6 +62,8 @@
 - [16. Model cards](#16-model-cards)
 - [17. Pawsey workflow & wandb](#17-pawsey-workflow--wandb)
 - [18. Release hardening status](#18-release-hardening-status)
+
+</details>
 
 ## 1. Project map — where everything lives
 
@@ -405,6 +436,22 @@ winner automatically):
 
 - **Lower is better**: `nCRPS`, `nMAE`, `MAE_Coverage`, `mean_wQuantileLoss`
 - **Higher is better**: `Accuracy`, `Qualified_Rate`, `R2`
+
+### 8.1. Model card
+
+Print any registered model's full card — model name, parameter count, metrics,
+architecture, hyper-parameters and training config — with `tools/model_card.py`:
+
+```bash
+"$PY" tools/model_card.py --list                        # every registered model (id, variant, mean nCRPS)
+"$PY" tools/model_card.py deepwind-small-paper-seed42   # one model's full card
+"$PY" tools/model_card.py small baseline-deepar         # `small` shorthand + multiple ids
+```
+
+It reads `results/leaderboard.jsonl` directly. Parameter counts are a property of
+the design (not the run), so they are curated in the script from the training log
+("Trainable parameters: ...") rather than stored in the registry; baselines carry
+no parameter count.
 
 ## 9. Compare
 

@@ -52,6 +52,12 @@ fixed run id equal to the run name (e.g. `deepwind-base-paper-seed42`).
   `train.py` calls `wandb.init(id=<run_name>, resume="allow")` with a *fixed*
   run name, so every chunk appends to the same run id and the step axis keeps
   growing across the 03:50 boundaries (3 chunks = 1 run).
+- **The `epoch` number resets each chunk — that is expected, watch `step` not
+  `epoch`.** Training is driven by `max_steps=100000` (not epochs), so the logged
+  `epoch` is derived from `global_step` and restarts near 0 on every resume.
+  `global_step` (the wandb x-axis) keeps growing across chunks and the loss / LR
+  curves stay continuous. A resetting `epoch` does **not** mean the run restarted
+  from scratch.
 - **The local `wandb/` dir shows one `run-<timestamp>-<id>` folder per chunk** —
   that is just each chunk's on-disk cache; the *server-side* run is still a
   single continuous run, so don't read multiple `run-*` folders as multiple runs.

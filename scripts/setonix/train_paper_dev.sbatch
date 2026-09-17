@@ -74,7 +74,11 @@ git -C "${DEEPWIND_PROJECT_ROOT}" diff --binary > "${run_dir}/metadata/uncommitt
 env | sort | sed -E '/(TOKEN|KEY|SECRET|PASSWORD|PASS)=/Id' > "${run_dir}/metadata/environment.txt"
 
 # --- DDP / RCCL endpoints --------------------------------------------------
-master_addr="$(scontrol show hostnames "${SLURM_JOB_NODELIST}" | head -n 1)"
+# c10d TCP rendezvous must use the Slingshot HSN address (-hsn0 -> 10.253.x).
+# The bare hostname resolves to the management net (10.168.x) which is not
+# routable between compute nodes (job 49417202: connect to nid002920:37202
+# timed out after 60s).
+master_addr="$(scontrol show hostnames "${SLURM_JOB_NODELIST}" | head -n 1)-hsn0"
 master_port="$((20000 + SLURM_JOB_ID % 20000))"
 gpus_per_node="${GPUS_PER_NODE:-8}"
 

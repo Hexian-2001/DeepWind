@@ -1,5 +1,9 @@
 # Pawsey asset inventory
 
+**Contents**
+
+- 1. De-duplication candidate (no deletion performed)
+
 The metadata-only inventory generated on 2026-09-14 is stored outside the public
 repository at:
 
@@ -41,7 +45,7 @@ catalogue at
 `/scratch/pawsey0115/hwang4/projects/deepwind/reports/experiment-catalog-2026-09-14.json`
 currently identifies 23 Trainer runs.
 
-## De-duplication candidate (no deletion performed)
+## 1. De-duplication candidate (no deletion performed)
 
 The two `deepwind_large_v5` checkpoint trees below are each approximately
 80 GB, contain the same 128 relative file names and sizes, and have matching
@@ -54,3 +58,8 @@ hashes for the root model configuration and safetensors index:
 
 They remain untouched. Payload checksums for every file and explicit owner
 approval are required before replacing one tree with a symlink or removing it.
+
+---
+
+**Related docs:** [Architecture audit](architecture-audit.md) · [Baselines & model comparison](baselines.md) · [Data](data.md) · [Model cards](model-cards.md) · [Pawsey workflow](pawsey.md) · [Refactor roadmap](refactor-roadmap.md) · [Reproducibility record](reproducibility.md)
+

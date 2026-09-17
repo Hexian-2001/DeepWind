@@ -1,11 +1,41 @@
 # Reproducibility record
 
-## Project map — where everything lives
+**Contents**
+
+- 1. Project map — where everything lives
+  - 1.1. Repo, environment & data
+  - 1.2. Entry-point scripts
+  - 1.3. Source (`src/`)
+  - 1.4. Configs (`configs/`)
+  - 1.5. Model weights (checkpoints)
+  - 1.6. Experiment records
+  - 1.7. Tooling (`tools/`) & docs
+- 2. Published specification
+- 3. Recovered final run
+- 4. Provenance requirements for every new run
+- 5. Step-by-step quick start
+- 6. Concept
+- 7. Pipeline
+  - 7.1. Train
+    - 7.1.1. Train on `gpu-dev` (chunked, when `gpu` is drained)
+  - 7.2. Evaluate
+  - 7.3. Data protocol (unified target grid)
+  - 7.4. Register
+- 8. Leaderboard schema
+- 9. Compare
+- 10. Export paper table
+- 11. Visualize (figures)
+  - 11.1. Rolling (stitched) forecast visualisations
+- 12. Seed sweep
+- 13. config_hash semantics
+- 14. Reuse & boundaries
+
+## 1. Project map — where everything lives
 
 One-page overview of the DeepWind codebase and its on-disk layout on Setonix.
 All paths are absolute and current as of the 2026-09 retrain campaign.
 
-### Repo, environment & data
+### 1.1. Repo, environment & data
 
 | Item | Path |
 |---|---|
@@ -23,7 +53,7 @@ deepwindData/
   train_metadata.csv / eval_metadata.csv / test_metadata.csv
 ```
 
-### Entry-point scripts
+### 1.2. Entry-point scripts
 
 | Task | Script | Config | Setonix launcher |
 |---|---|---|---|
@@ -32,7 +62,7 @@ deepwindData/
 | Inference | `infer.py` | `configs/infer.yaml` | — (run directly) |
 | Evaluate | `evaluate.py` | `configs/eval.yaml` | `scripts/setonix/eval_paper.sbatch` |
 
-### Source (`src/`)
+### 1.3. Source (`src/`)
 
 | Package | Contents |
 |---|---|
@@ -44,7 +74,7 @@ deepwindData/
 | `src/layers/` | Transformer building blocks |
 | `src/utils/` | `provenance.py`, `trainer.py`, `registry.py`, `metrics.py`, `distributed.py`, `cache.py`, `constants.py`, `vis.py` |
 
-### Configs (`configs/`)
+### 1.4. Configs (`configs/`)
 
 | Dir | Contents |
 |---|---|
@@ -54,7 +84,7 @@ deepwindData/
 | `configs/data_eval/` | per-dataset eval configs |
 | top-level | `train.yaml`, `eval.yaml`, `finetune.yaml`, `infer.yaml` |
 
-### Model weights (checkpoints)
+### 1.5. Model weights (checkpoints)
 
 Each training run lives under `runs/DeepWind-Research/<run_name>/` and holds the
 weights in `checkpoints/`:
@@ -75,7 +105,7 @@ DeepWind-Research/<run_name>/
 Example (Small):
 `runs/DeepWind-Research/deepwind-small-paper-seed42-20260914-164253/checkpoints/checkpoint-100000/`
 
-### Experiment records
+### 1.6. Experiment records
 
 | Record | Location |
 |---|---|
@@ -84,7 +114,7 @@ Example (Small):
 | Pipeline state (cron driver) | `runs/pipeline_state.json` |
 | wandb (online curves) | `https://wandb.ai/hexian-2001-shanxi-university/DeepWind-Research` |
 
-### Tooling (`tools/`) & docs
+### 1.7. Tooling (`tools/`) & docs
 
 | Script | Purpose |
 |---|---|
@@ -101,7 +131,7 @@ Paper figure/table scripts live in `reproduction/`; longer docs in `docs/`
 (`architecture-audit.md`, `asset-inventory.md`, `data.md`, `pawsey.md`,
 `refactor-roadmap.md`).
 
-## Published specification
+## 2. Published specification
 
 DeepWind-Large is described as an 18-layer, 1024-dimensional decoder-only
 Transformer with 16 heads, SwiGLU width 2816, 8 experts, Top-2 routing, patch
@@ -110,7 +140,7 @@ size 16, context length 8192, and 21 quantiles. The paper reports AdamW,
 warmup steps, cosine decay, gradient clipping at 1.0, BF16, global batch 256,
 and 100,000 steps.
 
-## Recovered final run
+## 3. Recovered final run
 
 > Historical note (pre-retrain): this describes the legacy `deepwind_large_v5`
 > checkpoint as recovered before the 2026-09 retrain campaign. The retrain
@@ -135,7 +165,7 @@ The current development YAML files also contained later experimental settings
 (Student-t heads, 4 experts for Base/Large, and 0.9/0.1 source weighting). They
 must not be presented as the paper checkpoint configuration.
 
-## Provenance requirements for every new run
+## 4. Provenance requirements for every new run
 
 Every run directory must retain:
 
@@ -157,7 +187,7 @@ The sections below describe how a completed train → eval run is registered int
 a **git-committed JSONL leaderboard** (`results/leaderboard.jsonl`), and how to
 compare, export paper tables, and run seed sweeps.
 
-## 0. Step-by-step quick start
+## 5. Step-by-step quick start
 
 Whenever you have a new model (new architecture / hyperparameters / seed / a
 finished training run), repeat these 5 steps. All commands run from the repo root.
@@ -222,8 +252,10 @@ sbatch --export=ALL,MODEL=small,CKPT=${CKPT},EVAL_NAME=eval-small-paper scripts/
 | Plot figures | `"$PY" tools/plot_results.py` |
 | Seed variance (mean±std) | `"$PY" tools/compare_models.py --family <hash> --group-family` |
 | Multi-seed training in one shot | `"$PY" tools/run_seed_sweep.py --model small --seeds 42,43,44` |
+| Train — `gpu` (24h, auto-requeue) | `sbatch --export=ALL,MODEL=base scripts/setonix/train_paper.sbatch` |
+| Train — `gpu-dev` (N chunks) | `scripts/setonix/submit_train_chunks.sh base 3` |
 
-## 1. Concept
+## 6. Concept
 
 - **Source of truth = `results/leaderboard.jsonl`** (append-only, one evaluated
   model per line, committed to git — reviewable, diffable, traceable). wandb and
@@ -234,17 +266,17 @@ sbatch --export=ALL,MODEL=small,CKPT=${CKPT},EVAL_NAME=eval-small-paper scripts/
   with different seeds hashes identically → a seed sweep automatically groups as
   one family, ready for mean±std.
 
-## 2. Pipeline
+## 7. Pipeline
 
 ```
-train (train_paper.sbatch)
+train (train_paper.sbatch — gpu 24h auto-requeue; or gpu-dev chunked, see 7.1.1)
    └─> evaluate (eval_paper.sbatch + tools/aggregate_eval.py)
           └─> register (tools/register_eval.py)          # writes results/leaderboard.jsonl
                  ├─> compare (tools/compare_models.py)
                  └─> paper table (tools/export_report.py)
 ```
 
-### 2.1 Train
+### 7.1. Train
 
 ```bash
 # 24h job on `gpu` (4 nodes x 8 GPUs = 32 GPUs); --requeue auto-resumes at the wall-clock limit
@@ -254,7 +286,7 @@ sbatch --export=ALL,MODEL=small scripts/setonix/train_paper.sbatch
 The run name is fixed to `deepwind-<model>-paper-seed42` (a `--requeue` reuses the
 same `output_dir`, so training auto-resumes across the 24h wall-clock limit).
 
-#### 2.1.1 Train on `gpu-dev` (chunked, when `gpu` is drained)
+#### 7.1.1. Train on `gpu-dev` (chunked, when `gpu` is drained)
 
 When the main `gpu` partition is backfilled/drained (`QOS=exhausted`, 0 idle
 nodes), train in manual 3h50m chunks on `gpu-dev` (its `MaxNodes=2`, so 2 x 8 =
@@ -264,6 +296,10 @@ nodes), train in manual 3h50m chunks on `gpu-dev` (its `MaxNodes=2`, so 2 x 8 =
 # one 3h50m chunk; no auto-requeue — it ends at wall-clock and the next chunk resumes from the last checkpoint
 sbatch --export=ALL,MODEL=base scripts/setonix/train_paper_dev.sbatch
 # chain N chunks back-to-back (afterany); --begin HH:MM delays the FIRST chunk
+#
+#   Usage: submit_train_chunks.sh <model> <n_chunks> [--begin HH:MM[:SS]]
+#     model     : small | base | large
+#     n_chunks  : how many 3h50m chunks to submit back-to-back (>= 1)  <- number of tasks
 scripts/setonix/submit_train_chunks.sh base 1                 # submit 1 chunk
 scripts/setonix/submit_train_chunks.sh base 3 --begin 03:30   # 3 chunks, first starts after 03:30
 ```
@@ -276,7 +312,7 @@ name (`deepwind-<model>-paper-seed42`) + `_detect_checkpoint` make each new chun
 auto-resume from the last checkpoint. See the script headers for the full
 per-model mapping and the `submit_train_chunks.sh` usage.
 
-### 2.2 Evaluate
+### 7.2. Evaluate
 
 ```bash
 # point CKPT at the training run's checkpoints dir, then submit the eval job
@@ -286,7 +322,7 @@ sbatch --export=ALL,MODEL=small,CKPT=${CKPT},EVAL_NAME=eval-small-paper scripts/
 "$PY" tools/aggregate_eval.py /scratch/pawsey0115/hwang4/projects/deepwind/runs/results/deepwind/eval-small-paper
 ```
 
-### 2.3 Data protocol (unified target grid)
+### 7.3. Data protocol (unified target grid)
 
 Every model — DeepWind and every baseline — is scored on the **same test
 targets**, produced by `src/evaluation/protocol.py`:
@@ -311,7 +347,7 @@ The baseline models (statistical / gradient-boosted / deep-learning / TSFMs) run
 on the identical protocol and windowing — see `docs/baselines.md` for the harness
 and the full ranked comparison table.
 
-### 2.4 Register
+### 7.4. Register
 
 ```bash
 "$PY" tools/register_eval.py \
@@ -329,7 +365,7 @@ and the full ranked comparison table.
 | `<eval_dir>/*/H_*.json` | per-dataset metrics |
 | `checkpoint-*/trainer_state.json` | `global_step` + final loss |
 
-## 3. Leaderboard schema
+## 8. Leaderboard schema
 
 Each line of `results/leaderboard.jsonl` is one JSON object:
 
@@ -367,7 +403,7 @@ winner automatically):
 - **Lower is better**: `nCRPS`, `nMAE`, `MAE_Coverage`, `mean_wQuantileLoss`
 - **Higher is better**: `Accuracy`, `Qualified_Rate`, `R2`
 
-## 4. Compare
+## 9. Compare
 
 ```bash
 "$PY" tools/compare_models.py --summary                       # quick ranking (one line per model, nCRPS ascending)
@@ -382,7 +418,7 @@ winner automatically):
 metric table + per-dataset nCRPS/nMAE tables + per-horizon nCRPS, marking each
 row's best value with ` <--`.
 
-## 5. Export paper table
+## 10. Export paper table
 
 ```bash
 "$PY" tools/export_report.py --format latex    --out results_table.tex        # LaTeX booktabs table (for the paper)
@@ -393,7 +429,7 @@ row's best value with ` <--`.
 The LaTeX output is a booktabs table (`\toprule`/`\midrule`/`\bottomrule`) with
 the best value bolded via `\textbf{}`.
 
-## 6. Visualize (figures)
+## 11. Visualize (figures)
 
 ```bash
 "$PY" tools/plot_results.py                            # all models -> reports/figures/
@@ -420,7 +456,7 @@ The figures are **regenerated views** over `results/leaderboard.jsonl` — the
 JSONL stays the committed source of truth, and `reports/` is git-ignored
 (regenerable on demand).
 
-### 6.1 Rolling (stitched) forecast visualisations
+### 11.1. Rolling (stitched) forecast visualisations
 
 ```bash
 "$PY" tools/plot_rolling_forecasts.py --model-id deepwind-small-paper-seed42                  # default (128 steps, 3 segments)
@@ -458,7 +494,7 @@ model plots the *same* contiguous blocks.
 | `--datasets` | all 8 | subset of benchmark datasets |
 | `--seed` | `42` | seed for the deterministic start selection |
 
-## 7. Seed sweep
+## 12. Seed sweep
 
 ```bash
 "$PY" tools/run_seed_sweep.py --model small --seeds 42,43,44 --dry-run   # preview the sbatch commands only
@@ -478,7 +514,7 @@ After each seed finishes training → evaluate → `register_eval.py`. Because
 > seed sweep's wandb tag still reads `seed42`; the true seed is the leaderboard's
 > `seed` field and `wandb.notes`/`run_name`.
 
-## 8. config_hash semantics
+## 13. config_hash semantics
 
 ```
 config_hash = sha256( canonical_json({ model, training', data', data_eval }) )
@@ -491,7 +527,7 @@ From `training` we strip the **run identity fields** (`run_name` / `output_dir` 
 from `data`. **The seed never participates in the hash** → the same design with
 different seeds yields the same `config_hash` and groups as one family.
 
-## 9. Reuse & boundaries
+## 14. Reuse & boundaries
 
 - These tools **only read** `run_info.json`; they do not re-collect provenance
   (`src/utils/provenance.py` already does that).
@@ -501,3 +537,8 @@ different seeds yields the same `config_hash` and groups as one family.
   / paper table).
 - The leaderboard stores **absolute /scratch paths** (honest and directly
   reproducible), redirectable via `DEEPWIND_RUNS_ROOT`.
+
+---
+
+**Related docs:** [Architecture audit](architecture-audit.md) · [Asset inventory](asset-inventory.md) · [Baselines & model comparison](baselines.md) · [Data](data.md) · [Model cards](model-cards.md) · [Pawsey workflow](pawsey.md) · [Refactor roadmap](refactor-roadmap.md)
+

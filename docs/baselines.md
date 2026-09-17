@@ -1,5 +1,16 @@
 # Baselines & Model Comparison
 
+**Contents**
+
+- 1. Model taxonomy
+- 2. Data protocol (identical for every model)
+- 3. Metrics
+- 4. Small-model hyperparameters
+- 5. Results
+- 6. Takeaway
+- 7. Reproduce
+- 8. Register into the leaderboard
+
 This document records the comparison models evaluated against DeepWind on the
 8 WindBench test datasets × 6 horizons, how they were trained/evaluated, and
 where their results live (the git-committed `results/leaderboard.jsonl`).
@@ -9,7 +20,7 @@ The harness itself is **decoupled** from DeepWind and lives at
 imports `src/utils/metrics.py::ForecastingEvaluator` to produce the *exact*
 same metrics as DeepWind's own evaluation.
 
-## Model taxonomy
+## 1. Model taxonomy
 
 | Family | Models | Protocol |
 |---|---|---|
@@ -27,7 +38,7 @@ Time-LLM was skipped (requires Llama weights; out of scope for this pass).
 > missing horizons) are therefore stale and **excluded** from the comparison
 > table below.
 
-## Data protocol (identical for every model)
+## 2. Data protocol (identical for every model)
 
 * Each `.npy` is `(V, T)`; the single wind-power series is row 0.
 * `train = series[0 : 0.7T]`, `val = series[0.7T : 0.8T]`, `test = series[0.8T : T]`.
@@ -37,7 +48,7 @@ Time-LLM was skipped (requires Llama weights; out of scope for this pass).
 * `pred_len = horizon_hours × 60 / resolution` (resolution per dataset in
   `DATASET_RES_CONFIG`).
 
-## Metrics
+## 3. Metrics
 
 Capacity-normalised. The 7 headline metrics are `nCRPS, nMAE, Accuracy,
 Qualified_Rate, MAE_Coverage, R2, mean_wQuantileLoss`. `Qualified_Rate` uses the
@@ -45,7 +56,7 @@ same horizon-aware threshold as DeepWind: `0.15` for `horizon ≤ 4 h`, else
 `0.25`. The small models emit a 21-quantile grid `[0.01 … 0.99]`; the TSFMs emit
 their native 9-quantile grid `[0.1 … 0.9]`.
 
-## Small-model hyperparameters
+## 4. Small-model hyperparameters
 
 | Model | Specification |
 |---|---|
@@ -62,7 +73,7 @@ Quantiles are produced from the Gaussian predictive distribution
 (`mean + Φ⁻¹(q)·σ`) for every model, so `MAE_Coverage` / `nCRPS` are directly
 comparable across models.
 
-## Results
+## 5. Results
 
 Macro-average (8 datasets × 6 horizons) — see `results/leaderboard.jsonl` for
 the authoritative rows and `tools/compare_models.py --summary` for ranking.
@@ -93,7 +104,7 @@ Ordered by nCRPS (lower is better).
 > otherwise) instead of a fixed 0.25 — and the three previously-missing metrics,
 > which are now populated.
 
-## Takeaway
+## 6. Takeaway
 
 DeepAR is the strongest trained small model (nCRPS 0.0937, R2 0.6433),
 beating all three TSFMs and DeepWind-Small on this protocol; LightGBM is the
@@ -102,7 +113,7 @@ threshold as the small models; the only remaining mismatch is 9 vs 21 quantiles
 (a slightly coarser CRPS for the TSFMs), so the ordering across the two groups
 is directly comparable with that one caveat.
 
-## Reproduce
+## 7. Reproduce
 
 ```bash
 # install deps (into the deepwind venv)
@@ -122,10 +133,15 @@ is directly comparable with that one caveat.
 # (or via baselines/run_tsfm.sbatch, which also sets HF_HOME/HOME for cached weights)
 ```
 
-## Register into the leaderboard
+## 8. Register into the leaderboard
 
 ```bash
 python tools/register_baselines.py \
   /scratch/pawsey0115/hwang4/deepwind_experiments/baselines/results/<MODEL_DIR> \
   --model-id baseline-<name> --tags baseline,<family>,trained
 ```
+
+---
+
+**Related docs:** [Architecture audit](architecture-audit.md) · [Asset inventory](asset-inventory.md) · [Data](data.md) · [Model cards](model-cards.md) · [Pawsey workflow](pawsey.md) · [Refactor roadmap](refactor-roadmap.md) · [Reproducibility record](reproducibility.md)
+

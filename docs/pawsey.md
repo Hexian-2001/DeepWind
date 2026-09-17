@@ -1,5 +1,10 @@
 # Pawsey Setonix workflow
 
+**Contents**
+
+- 1. Production training
+- 2. Watching training with wandb
+
 Keep Git repositories and environments under `/software/projects`, and keep
 large datasets, checkpoints, logs, W&B caches, and temporary outputs under
 `/scratch`.
@@ -23,7 +28,7 @@ For each production launch, record `module list`, `$SINGULARITY_CONTAINER`,
 `git rev-parse HEAD`, `git status --porcelain`, `pip freeze`, and Slurm metadata
 inside the run directory.
 
-## Production training
+## 1. Production training
 
 The launcher streams metrics to Weights & Biases live — `WANDB_MODE=online`
 is set inside the sbatch, so you can watch loss and checkpoints in the browser
@@ -40,7 +45,7 @@ When the `gpu` partition is drained, chain shorter `gpu-dev` chunks instead:
 scripts/setonix/submit_train_chunks.sh large 8
 ```
 
-## Watching training with wandb
+## 2. Watching training with wandb
 
 Every training run logs to the wandb project **`DeepWind-Research`**, using a
 fixed run id equal to the run name (e.g. `deepwind-base-paper-seed42`).
@@ -74,3 +79,8 @@ fixed run id equal to the run name (e.g. `deepwind-base-paper-seed42`).
 The launcher records the commit, dirty-tree patch, resolved command, loaded
 modules, Python packages, and a secret-filtered environment snapshot under the
 run's `metadata/` directory.
+
+---
+
+**Related docs:** [Architecture audit](architecture-audit.md) · [Asset inventory](asset-inventory.md) · [Baselines & model comparison](baselines.md) · [Data](data.md) · [Model cards](model-cards.md) · [Refactor roadmap](refactor-roadmap.md) · [Reproducibility record](reproducibility.md)
+

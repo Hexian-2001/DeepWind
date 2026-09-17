@@ -1,6 +1,13 @@
 # Data
 
-## Expected processed layout
+**Contents**
+
+- 1. Expected processed layout
+- 2. Corpus and sampling
+- 3. Split isolation
+- 4. Redistribution
+
+## 1. Expected processed layout
 
 ```text
 $DEEPWIND_DATA_ROOT/
@@ -17,7 +24,7 @@ pads heterogeneous inputs to `max_vars` and supplies a channel mask. Instance
 normalisation is computed online from each sampled context window; capacity is
 kept in the evaluation metadata/constants rather than this training CSV.
 
-## Corpus and sampling
+## 2. Corpus and sampling
 
 The paper reports approximately 562.4 billion observations from WIND Toolkit
 and 19 additional sources. It specifies source-level sampling probabilities of
@@ -33,16 +40,21 @@ The recovered final training configuration predates the current explicit
 
 Do not silently substitute one for another.
 
-## Split isolation
+## 3. Split isolation
 
 WindBench sites must not occur in pretraining. For WIND Toolkit targets, retain
 the paper's 10 km spatial exclusion buffer. For SCADA sources, exclude the exact
 held-out farm or turbine before window generation. A future public preprocessing
 release must emit a machine-readable split manifest and contamination audit.
 
-## Redistribution
+## 4. Redistribution
 
 This repository does not redistribute the 2.1 TB processed corpus. Users must
 obtain each source under its own terms. Shanxi Wind is proprietary and cannot be
 published. Release download/preprocessing scripts and checksums for public
 sources instead of uploading derived data without a license review.
+
+---
+
+**Related docs:** [Architecture audit](architecture-audit.md) · [Asset inventory](asset-inventory.md) · [Baselines & model comparison](baselines.md) · [Model cards](model-cards.md) · [Pawsey workflow](pawsey.md) · [Refactor roadmap](refactor-roadmap.md) · [Reproducibility record](reproducibility.md)
+

@@ -1,10 +1,17 @@
 # Architecture and reproducibility audit
 
+**Contents**
+
+- 1. Confirmed implementation
+- 2. Material provenance differences
+- 3. Issues found and disposition
+- 4. Gates before full retraining
+
 This audit distinguishes three targets: the Energy paper, the configuration
 stored with `deepwind_large_v5`, and the repository defaults. They must not be
 silently treated as identical.
 
-## Confirmed implementation
+## 1. Confirmed implementation
 
 - Input series are instance-normalised (optionally with `arcsinh`), split into
   patches of 16, concatenated with relative time values, and projected to the
@@ -16,7 +23,7 @@ silently treated as identical.
 - The quantile head predicts 21 values per point. Training uses next-patch
   pinball loss plus the averaged MoE load-balancing loss.
 
-## Material provenance differences
+## 2. Material provenance differences
 
 | Item | Paper | Final checkpoint (`deepwind_large_v5`) | Earlier repository default |
 |---|---:|---:|---:|
@@ -32,7 +39,7 @@ The immutable recovered configuration is recorded in
 choose between **checkpoint replication** and **paper-spec replication** and
 receive a new experiment name.
 
-## Issues found and disposition
+## 3. Issues found and disposition
 
 - `use_xpos` was ignored and xPOS was always enabled with RoPE. Fixed by
   plumbing the switch; the final checkpoint behaviour is unchanged because its
@@ -50,7 +57,7 @@ receive a new experiment name.
   the implementation assigns one axis to each Transformer layer. Public model
   depth documentation must use the implementation convention.
 
-## Gates before full retraining
+## 4. Gates before full retraining
 
 1. Decide checkpoint-replication vs paper-spec configuration.
 2. Freeze and checksum train/eval manifests; document WindBench exclusion.
@@ -59,3 +66,8 @@ receive a new experiment name.
 5. Run a fixed-seed Small-model baseline before committing to Large.
 
 The two-node, four-process DDP gate passed on Setonix as Slurm job `48776871`.
+
+---
+
+**Related docs:** [Asset inventory](asset-inventory.md) · [Baselines & model comparison](baselines.md) · [Data](data.md) · [Model cards](model-cards.md) · [Pawsey workflow](pawsey.md) · [Refactor roadmap](refactor-roadmap.md) · [Reproducibility record](reproducibility.md)
+

@@ -54,6 +54,13 @@ esac
 OVERRIDES="training.gradient_accumulation_steps=${ACCUM} training.save_steps=1000"
 OVERRIDES="${OVERRIDES} ${DEEPWIND_TRAIN_OVERRIDES:-}"
 
+# --- End-of-chunk save deadline (~2 min before the 03:50:00 wall-clock) -----
+# The SIGTERM graceful save cannot finish a Base/Large 10 GB checkpoint within
+# the 12-30 s SIGTERM->SIGKILL window (job 49418245), so train.py saves + stops
+# at this wall-clock deadline instead (computed from this script's start time).
+# Override via --export=ALL,DEEPWIND_SAVE_AFTER=<seconds> (e.g. 300 for a test).
+export DEEPWIND_SAVE_DEADLINE="$(( $(date +%s) + ${DEEPWIND_SAVE_AFTER:-13680} ))"
+
 # --- Paths (self-contained; DEEPWIND_* are NOT in ~/.bashrc) ---------------
 export DEEPWIND_PROJECT_ROOT="${DEEPWIND_PROJECT_ROOT:-/software/projects/pawsey0115/hwang4/research_projects/DeepWind}"
 export DEEPWIND_DATA_ROOT="${DEEPWIND_DATA_ROOT:-/scratch/pawsey0115/hwang4/deepwindData}"

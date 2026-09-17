@@ -4,6 +4,7 @@ import atexit
 import logging
 import os
 import signal
+import time
 
 import hydra
 import torch.distributed as dist
@@ -63,6 +64,36 @@ class _GracefulSaveCallback(TrainerCallback):
             return
         control.should_save = True
         control.should_training_stop = True
+
+
+class _TimeBudgetSaveCallback(TrainerCallback):
+    """Save + stop once a wall-clock deadline (epoch seconds) is reached.
+
+    This is the reliable replacement for the SIGTERM graceful save: instead of
+    racing a signal against Slurm's SIGKILL window (a Base/Large 10 GB
+    checkpoint cannot be written within the 12-30 s SIGTERM->SIGKILL window;
+    validated on job 49418245), we trigger a normal save_steps-style checkpoint
+    during ordinary training flow, well before the wall-clock limit. The
+    deadline is read from the ``DEEPWIND_SAVE_DEADLINE`` env var (epoch seconds;
+    0 / unset = disabled).
+    """
+
+    def __init__(self, deadline: float):
+        self._deadline = float(deadline)
+        self._fired = False
+
+    def on_step_end(self, args, state, control, **kwargs):
+        if self._fired or self._deadline <= 0:
+            return
+        if time.time() >= self._deadline:
+            self._fired = True
+            logger.warning(
+                "Wall-clock save deadline reached at global_step=%d; saving a "
+                "checkpoint and stopping.",
+                state.global_step,
+            )
+            control.should_save = True
+            control.should_training_stop = True
 
 
 # ---------------------------------------------------------------------------
@@ -268,6 +299,14 @@ def main(cfg: DictConfig) -> None:
     #     (validated on job 49413237).
     trainer.add_callback(_GracefulSaveCallback())
     signal.signal(signal.SIGTERM, _request_shutdown)
+
+    # 5c. Wall-clock save: save + stop once DEEPWIND_SAVE_DEADLINE (epoch
+    #     seconds) is reached. Reliable replacement for the SIGTERM save, which
+    #     cannot finish a Base/Large 10 GB checkpoint within the 12-30 s
+    #     SIGTERM->SIGKILL window (validated on job 49418245).
+    _save_deadline = float(os.environ.get("DEEPWIND_SAVE_DEADLINE", "0") or "0")
+    if _save_deadline > 0:
+        trainer.add_callback(_TimeBudgetSaveCallback(_save_deadline))
 
     # 6. Synchronise all ranks before training begins
     if dist.is_available() and dist.is_initialized():

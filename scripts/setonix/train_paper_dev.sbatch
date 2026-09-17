@@ -74,11 +74,7 @@ git -C "${DEEPWIND_PROJECT_ROOT}" diff --binary > "${run_dir}/metadata/uncommitt
 env | sort | sed -E '/(TOKEN|KEY|SECRET|PASSWORD|PASS)=/Id' > "${run_dir}/metadata/environment.txt"
 
 # --- DDP / RCCL endpoints --------------------------------------------------
-# c10d TCP rendezvous must use the Slingshot HSN address (-hsn0 -> 10.253.x).
-# The bare hostname resolves to the management net (10.168.x) which is not
-# routable between compute nodes (job 49417202: connect to nid002920:37202
-# timed out after 60s).
-master_addr="$(scontrol show hostnames "${SLURM_JOB_NODELIST}" | head -n 1)-hsn0"
+master_addr="$(scontrol show hostnames "${SLURM_JOB_NODELIST}" | head -n 1)"
 master_port="$((20000 + SLURM_JOB_ID % 20000))"
 gpus_per_node="${GPUS_PER_NODE:-8}"
 
@@ -108,5 +104,21 @@ command="${DEEPWIND_VENV}/bin/python -m torch.distributed.run \
   ${OVERRIDES}"
 printf '%s\n' "${command}" > "${run_dir}/metadata/command.txt"
 
-srun -N "${SLURM_JOB_NUM_NODES}" -n "${SLURM_JOB_NUM_NODES}" --cpu-bind=none \
-  bash -c "${command}"
+# The c10d TCP rendezvous over the management net (10.168.x) is occasionally
+# flaky (60s connect timeout); retry the torchrun launch a few times. NCCL
+# (RDMA over Slingshot) is reliable once past the rendezvous.
+launched=0
+for attempt in 1 2 3; do
+  echo "=== torchrun launch attempt ${attempt}/3 ==="
+  if srun -N "${SLURM_JOB_NUM_NODES}" -n "${SLURM_JOB_NUM_NODES}" --cpu-bind=none \
+      bash -c "${command}"; then
+    launched=1
+    break
+  fi
+  echo "=== torchrun attempt ${attempt} failed; retrying in 15s ==="
+  sleep 15
+done
+if [ "${launched}" -ne 1 ]; then
+  echo "ERROR: torchrun launch failed after 3 attempts" >&2
+  exit 1
+fi

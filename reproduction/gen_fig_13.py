@@ -346,16 +346,12 @@ def main(args) -> None:
         ctx_len = max(512, test_len // 2)
         logger.info("Short dataset, falling back to ctx_len=%d", ctx_len)
 
-    available = max(1, test_len - ctx_len - pred_len + 1)
-    stride    = max(pred_len, available // TARGET_MAX_WINDOWS)
-
     test_ds = DeepWindTestDataset(
         npy_path          = npy_path,
         metadata_path     = args.metadata_path,
         context_length    = ctx_len,
         prediction_length = pred_len,
         split             = "test",
-        stride            = stride,
     )
 
     def make_loader():

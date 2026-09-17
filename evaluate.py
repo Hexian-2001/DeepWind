@@ -55,7 +55,6 @@ def _build_dataloader(
     Returns:
         (dataset, dataloader) tuple.
     """
-    stride = cfg.data.get("stride", None) or pred_len
 
     # Per-dataset context override (e.g. gefc12/gefc14 use 1024 instead of the
     # model's 8192 so DeepWind is not disadvantaged on the short series).
@@ -71,7 +70,6 @@ def _build_dataloader(
         metadata_path     = cfg.data.metadata_path,
         context_length    = context_length,
         prediction_length = pred_len,
-        stride            = stride,
     )
 
     sampler = DistributedSampler(

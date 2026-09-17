@@ -700,8 +700,6 @@ class DeepWindTestDataset(Dataset):
         split:             Which segment to use: "train", "val", or "test".
         train_ratio:       Fraction of timesteps for training.   Default 0.7.
         val_ratio:         Fraction of timesteps for validation. Default 0.1.
-        stride:            Step between consecutive window start positions.
-                           Defaults to prediction_length (non-overlapping targets).
         max_vars:          Channel dimension after padding. Must match training.
         pad_val_id:        Variate embedding ID used for padded channels.
     """
@@ -717,7 +715,6 @@ class DeepWindTestDataset(Dataset):
         split:             str = "test",
         train_ratio:       float = 0.7,
         val_ratio:         float = 0.1,
-        stride:            Optional[int] = None,
         max_vars:          int = 6,
         pad_val_id:        int = 10,
     ) -> None:
@@ -737,14 +734,11 @@ class DeepWindTestDataset(Dataset):
         self.prediction_length = prediction_length
         self.window_length     = context_length + prediction_length
         self.split             = split
-        self.stride            = stride if stride is not None else prediction_length
         self.max_vars          = max_vars
         self.pad_val_id        = pad_val_id
 
         if not self.npy_path.is_file():
             raise FileNotFoundError(f"[DeepWindTest] File not found: {self.npy_path}")
-        if self.stride <= 0:
-            raise ValueError(f"stride must be positive, got {self.stride}")
 
         # Metadata
         self.meta_store = MetadataStore(metadata_path)
@@ -759,7 +753,7 @@ class DeepWindTestDataset(Dataset):
             )
         self._C, self._T = data.shape
 
-        # ── Compute split boundaries (on raw time axis) ───────────────────────
+        # ── Compute split boundary (on raw time axis) ─────────────────────────
         t_train = int(self._T * train_ratio)
         t_val   = int(self._T * (train_ratio + val_ratio))
         # test runs from t_val to T
@@ -770,45 +764,43 @@ class DeepWindTestDataset(Dataset):
             "test":  (t_val,   self._T),
         }[split]
 
-        split_len = self._split_end - self._split_start
-        if split_len < self.window_length:
-            fallback_ctx = 512
-            fallback_window = fallback_ctx + self.prediction_length
-            if split_len < fallback_window:
+        # ── Unified evaluation protocol: canonical target grid ───────────────
+        # Targets tile the split non-overlapping by prediction_length, starting
+        # at the split boundary. The context for each target is the
+        # context_length steps immediately preceding its start, and MAY extend
+        # before the split (into val/train). This keeps target timestamps and
+        # counts identical across models with different context lengths
+        # (DeepWind 8192 vs baselines 1024). No 512 fallback: every model is
+        # evaluated with its full configured context.
+        # Canonical reference: src/evaluation/protocol.py (test_target_starts).
+        last_target = self._split_end - self.prediction_length
+        if last_target < self._split_start:
+            self._starts = []
+        else:
+            target_starts = list(
+                range(self._split_start, last_target + 1, self.prediction_length)
+            )
+            # self._starts holds *context* starts = target_start - context_length,
+            # so __getitem__'s ``split = start + context_length`` lands exactly
+            # on the target start.
+            self._starts = [s - self.context_length for s in target_starts]
+            if self._starts[0] < 0:
                 raise ValueError(
-                    f"[DeepWindTest] '{split}' split too short even for fallback: "
-                    f"split_len={split_len} < fallback_window={fallback_window} "
-                    f"({self.npy_path.name})."
+                    f"[DeepWindTest] not enough history before '{split}' split for "
+                    f"context_length={self.context_length} "
+                    f"({self.npy_path.name}, T={self._T})."
                 )
-            if is_main_process():
-                logger.warning(
-                    "[DeepWindTest] %s  '%s' split too short for ctx=%d "
-                    "(split_len=%d < window=%d). "
-                    "Falling back to context_length=%d.",
-                    self.npy_path.name, split,
-                    self.context_length, split_len, self.window_length,
-                    fallback_ctx,
-                )
-            self.context_length = fallback_ctx
-            self.window_length  = fallback_window
-
-        # ── Pre-compute window start positions (absolute indices) ─────────────
-        # Windows must not cross the split boundary:
-        #   start >= split_start
-        #   start + window_length <= split_end
-        first_start = self._split_start
-        last_start  = self._split_end - self.window_length
-        self._starts = list(range(first_start, last_start + 1, self.stride))
 
         if is_main_process():
             logger.info(
                 "[DeepWindTest] %s  split=%s  "
                 "range=[%d, %d)  split_len=%d  windows=%d  "
-                "ctx=%d  pred=%d  stride=%d",
+                "ctx=%d  pred=%d",
                 self.npy_path.name, split,
-                self._split_start, self._split_end, split_len,
+                self._split_start, self._split_end,
+                self._split_end - self._split_start,
                 len(self._starts),
-                self.context_length, self.prediction_length, self.stride,
+                self.context_length, self.prediction_length,
             )
 
     # ── Dataset protocol ──────────────────────────────────────────────────────

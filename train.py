@@ -3,6 +3,7 @@ from __future__ import annotations
 import atexit
 import logging
 import os
+import signal
 
 import hydra
 import torch.distributed as dist
@@ -10,6 +11,7 @@ import transformers
 import wandb
 from omegaconf import DictConfig, OmegaConf
 from transformers import (
+    TrainerCallback,
     TrainingArguments,
     default_data_collator,
     set_seed,
@@ -25,6 +27,42 @@ from src.utils.registry import CONFIG_REGISTRY, DATASET_REGISTRY, MODEL_REGISTRY
 from src.utils.trainer import DeepWindTrainer
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Graceful shutdown on SIGTERM (preemption / wall-clock kill)
+# ---------------------------------------------------------------------------
+# Slurm sends SIGTERM when a job hits its wall-clock limit or is preempted.
+# HuggingFace Trainer does NOT save on SIGTERM by default, so we record the
+# signal here and a callback saves a resumable checkpoint at the next step
+# boundary before stopping. This lets the chunked gpu-dev jobs (no --requeue)
+# and preempted 24h jobs resume from the last completed step.
+_shutdown_requested = False
+
+
+def _request_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    logger.warning(
+        "Received signal %d; saving a checkpoint at the next step boundary "
+        "and stopping.",
+        signum,
+    )
+
+
+class _GracefulSaveCallback(TrainerCallback):
+    """Save a checkpoint and stop at the next step boundary after SIGTERM.
+
+    Setting ``control.should_save`` makes the Trainer's post-step
+    ``_maybe_log_save_evaluate`` write ``checkpoint-<global_step>`` (rank 0
+    only, like a normal ``save_steps`` save), and ``should_training_stop``
+    ends the loop right afterwards.
+    """
+
+    def on_step_end(self, args, state, control, **kwargs):
+        if not _shutdown_requested:
+            return
+        control.should_save = True
+        control.should_training_stop = True
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +258,10 @@ def main(cfg: DictConfig) -> None:
         eval_dataset=eval_dataset,
         data_collator=default_data_collator,
     )
+
+    # 5b. Graceful shutdown: save + stop at the next step boundary on SIGTERM.
+    trainer.add_callback(_GracefulSaveCallback())
+    signal.signal(signal.SIGTERM, _request_shutdown)
 
     # 6. Synchronise all ranks before training begins
     if dist.is_available() and dist.is_initialized():

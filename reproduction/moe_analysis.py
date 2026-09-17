@@ -830,24 +830,12 @@ if __name__ == "__main__":
                 ds_name, test_len, ctx_len,
             )
 
-        # Adaptive stride: cap total windows at TARGET_MAX_WINDOWS
-        available = max(1, test_len - ctx_len - pred_len + 1)
-        stride    = max(pred_len, available // TARGET_MAX_WINDOWS)
-
-        if stride > pred_len:
-            logger.info(
-                "[%s] Large dataset (test_len=%d, available=%d), "
-                "using stride=%d (~%d windows)",
-                ds_name, test_len, available, stride, available // stride,
-            )
-
         return DeepWindTestDataset(
             npy_path          = npy_path,
             metadata_path     = args.metadata_path,
             context_length    = ctx_len,
             prediction_length = pred_len,
             split             = "test",
-            stride            = stride,
         )
 
     run_full_analysis(

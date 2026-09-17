@@ -23,10 +23,11 @@
 #   small        : per_device 8 x accum 2 = 16 / card -> 16 x 16 = 256
 #   base | large : per_device 4 x accum 4 = 16 / card -> 16 x 16 = 256
 #
-# NO --requeue / USR1 signal: the job simply ends at wall-clock; Slurm's
-# SIGTERM triggers the Trainer's graceful save, so the last completed step is
-# checkpointed. (Manual control keeps nodes free for the 03:00 weather-model
-# inference.)
+# NO --requeue / USR1 signal: the job simply ends at wall-clock. train.py
+# catches Slurm's SIGTERM and saves a resumable checkpoint at the next step
+# boundary (on top of the periodic save_steps=1000 checkpoints), so chained
+# submissions resume from the last completed step. (Manual control keeps
+# nodes free for the 03:00 weather-model inference.)
 #
 #   sbatch --export=ALL,MODEL=base  scripts/setonix/train_paper_dev.sbatch
 #   sbatch --export=ALL,MODEL=large scripts/setonix/train_paper_dev.sbatch

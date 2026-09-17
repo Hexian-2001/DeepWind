@@ -83,6 +83,7 @@ export WANDB_DIR="${run_dir}/wandb"
 # peak LR 1e-4, warmup 3% (3000 steps), cosine, grad clip 1.0, BF16, 100k steps.
 command="${DEEPWIND_VENV}/bin/python -m torch.distributed.run \
   --nproc_per_node=${gpus_per_node} --nnodes=${SLURM_JOB_NUM_NODES} \
+  --node_rank=\${SLURM_NODEID} \
   --rdzv_id=${SLURM_JOB_ID} --rdzv_backend=c10d \
   --rdzv_endpoint=${master_addr}:${master_port} \
   ${DEEPWIND_PROJECT_ROOT}/train.py \

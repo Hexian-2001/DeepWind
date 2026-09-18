@@ -49,7 +49,8 @@ master_port="$((20000 + SLURM_JOB_ID % 20000))"
 gpus_per_node="${GPUS_PER_NODE:-8}"
 
 command="${DEEPWIND_VENV}/bin/python -m torch.distributed.run \
-  --nproc_per_node=${gpus_per_node} --nnodes=1 \
+  --nproc_per_node=${gpus_per_node} --nnodes=${SLURM_JOB_NUM_NODES} \
+  --node_rank=\${SLURM_NODEID} \
   --rdzv_id=${SLURM_JOB_ID} --rdzv_backend=c10d \
   --rdzv_endpoint=${master_addr}:${master_port} \
   ${DEEPWIND_PROJECT_ROOT}/evaluate.py \

@@ -2,12 +2,12 @@
 #SBATCH --output=/scratch/pawsey0115/hwang4/projects/deepwind/runs/slurm-logs/%x-%j.out
 #SBATCH --error=/scratch/pawsey0115/hwang4/projects/deepwind/runs/slurm-logs/%x-%j.err
 #SBATCH --job-name=dw-eval
-#SBATCH --partition=gpu
-#SBATCH --nodes=1
+#SBATCH --partition=gpu-dev
+#SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=8
 #SBATCH --exclusive
-#SBATCH --time=02:00:00
+#SBATCH --time=03:50:00
 #SBATCH --account=pawsey0115-gpu
 
 # ---------------------------------------------------------------------------
@@ -60,4 +60,4 @@ command="${DEEPWIND_VENV}/bin/python -m torch.distributed.run \
   output.save_rolling_plots=false"
 printf '%s\n' "${command}" > "${out_dir}/command.txt"
 
-srun -N 1 -n 1 --cpu-bind=none bash -c "${command}"
+srun -N "${SLURM_JOB_NUM_NODES}" -n "${SLURM_JOB_NUM_NODES}" --cpu-bind=none bash -c "${command}"

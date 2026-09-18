@@ -31,7 +31,7 @@ data:
     - "${oc.env:DEEPWIND_DATA_ROOT}/test/penmanshiel_15.npy"
 
 inference:
-  batch_size: 4
+  batch_size: 16
   num_workers: 8
   use_amp: false
   horizon_h:
@@ -42,7 +42,7 @@ inference:
     - 8
     - 12
   seasonality_fallback: 96
-  mqd_infer: true
+  mqd_infer: false
   use_kv_cache: null
   checkpoint_path: "${base_dir}/checkpoints/deepwind/${model_name}"
   adapter_path: null

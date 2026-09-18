@@ -52,6 +52,7 @@ class DeepWindConfig(PretrainedConfig):
         # ── Distribution head ──────────────────────────────────────────────
         pred_head_type:    str   = "quantile",   # "quantile" | "student_t" | "zi_beta" | "gmm"
         gmm_components:    int   = 3,            # only used when pred_head_type="gmm"
+        channel_loss_weights: Optional[List[float]] = None,  # per-variate loss weight (len V; idx 0 = power); None = equal
 
         **kwargs,
     ):
@@ -95,5 +96,6 @@ class DeepWindConfig(PretrainedConfig):
         # Distribution
         self.pred_head_type  = pred_head_type
         self.gmm_components  = gmm_components
+        self.channel_loss_weights = channel_loss_weights
         
         super().__init__(**kwargs)

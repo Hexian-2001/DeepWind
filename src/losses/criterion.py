@@ -70,6 +70,11 @@ class DeepWindCriterion(nn.Module):
         self.config     = config
         self.aux_weight = getattr(config, "aux_loss_weight", 0.0)
         self.register_buffer("quantiles", torch.tensor(config.quantiles))
+        _cw = getattr(config, "channel_loss_weights", None)
+        self.register_buffer(
+            "channel_weights",
+            torch.tensor(_cw, dtype=torch.float32) if _cw is not None else None,
+        )
 
     def forward(
         self,
@@ -93,7 +98,9 @@ class DeepWindCriterion(nn.Module):
 
         # ── Channel mask ──────────────────────────────────────────────────────
         if channel_mask is not None:
-            mask_exp  = channel_mask.view(loss.shape[0], loss.shape[1], 1, 1, 1)
+            mask_exp  = channel_mask.to(loss.dtype).view(loss.shape[0], loss.shape[1], 1, 1, 1)
+            if self.channel_weights is not None:
+                mask_exp = mask_exp * self.channel_weights.to(loss.dtype).view(1, -1, 1, 1, 1)
             loss      = loss * mask_exp
             main_loss = loss.sum() / (
                 mask_exp.sum() * loss.shape[2] * loss.shape[3] * loss.shape[4] + 1e-6
@@ -145,6 +152,11 @@ class DistributionCriterion(nn.Module):
         self.head_type  = getattr(config, "pred_head_type", "student_t")
         self.K          = getattr(config, "gmm_components", 3)
         self.aux_weight = getattr(config, "aux_loss_weight", 0.0)
+        _cw = getattr(config, "channel_loss_weights", None)
+        self.register_buffer(
+            "channel_weights",
+            torch.tensor(_cw, dtype=torch.float32) if _cw is not None else None,
+        )
 
     def forward(
         self,
@@ -171,7 +183,9 @@ class DistributionCriterion(nn.Module):
 
         # ── Channel mask ──────────────────────────────────────────────────────
         if channel_mask is not None:
-            mask_exp  = channel_mask.view(B, V, 1).float()  # (B, V, 1)
+            mask_exp  = channel_mask.to(nll.dtype).view(B, V, 1)  # (B, V, 1)
+            if self.channel_weights is not None:
+                mask_exp = mask_exp * self.channel_weights.to(nll.dtype).view(1, V, 1)
             nll       = nll * mask_exp
             main_loss = nll.sum() / (mask_exp.sum() * T + 1e-6)
         else:

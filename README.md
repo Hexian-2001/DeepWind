@@ -57,8 +57,7 @@ attention + sparse mixture-of-experts + autoregressive multi-quantile decoding.*
 
 > nCRPS is the arithmetic mean over the six forecasting horizons (1–12 h),
 > each of which is itself the mean across the eight WindBench datasets — the
-> paper's zero-shot protocol. The horizon-by-horizon breakdown is in
-> [Results](#results).
+> paper's zero-shot protocol.
 
 All three sizes share **exactly the same interface** — swap the checkpoint
 string and nothing else in your code changes. They differ only in depth, width,

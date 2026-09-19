@@ -388,14 +388,13 @@ paper's short-benchmark extrapolation.
 |---|---|---|---|---|
 | Small | ~33 M | ~1.7 steps/s | ~16 h | ~260 |
 | Base | ~890 M | ~0.2 steps/s | ~134 h | ~2,140 |
-| Large | ~1.3 B | ~0.34 steps/s | ~83 h | ~1,320 |
+| Large | ~1.3 B | ~0.14 steps/s | ~196 h | ~3,140 |
 
 > Sources: **Small** — today's `deepwind-small-loss-powonly` run
 > (checkpoint→checkpoint on 16 MI250X). **Base** — the Sep-18
 > `deepwind-base-paper-seed42` run (real wall-clock, before the
 > `ddp_find_unused_parameters=false` fix, so expect it to improve on re-run).
-> **Large** — the Feb-2026 `deepwind_large_v5` benchmark; re-measure when Large is
-> re-trained. GPU-hours = wall time × 16.
+> GPU-hours = wall time × 16.
 
 So a Small reproduction is a single overnight run on a 16-GPU node; Base and
 Large are multi-day jobs. On fewer GPUs the wall time scales up roughly linearly

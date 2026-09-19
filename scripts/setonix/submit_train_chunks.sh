@@ -20,7 +20,7 @@
 #   submit_train_chunks.sh base 3 --begin 03:30    # start after 03:30
 
 set -euo pipefail
-mkdir -p /scratch/pawsey0115/hwang4/projects/deepwind/runs/slurm-logs
+mkdir -p slurm-logs
 
 if [ "$#" -lt 2 ]; then
   sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' >&2

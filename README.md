@@ -121,7 +121,11 @@ Model variants live under `configs/model/` (`deepwind_small`, `deepwind_base`,
 `deepwind_large`); training schedules live under `configs/training/`.
 
 On Pawsey Setonix, use the centre-provided PyTorch ROCm container and the job
-templates under `scripts/setonix/`.
+templates under `scripts/setonix/`. The templates are account-portable: they
+resolve run/data/venv/project roots from `$MYSCRATCH` and `$MYSOFTWARE`
+(override with the `DEEPWIND_*` variables above), and you must set your own
+Slurm account (`--account=YOUR_PROJECT-gpu`) and create `slurm-logs/` in your
+submit directory before a direct `sbatch`.
 
 ## Evaluation
 

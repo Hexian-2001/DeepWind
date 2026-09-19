@@ -1,12 +1,12 @@
 #!/bin/bash --login
-#SBATCH --output=/scratch/pawsey0115/hwang4/projects/deepwind/runs/slurm-logs/%x-%j.out
-#SBATCH --error=/scratch/pawsey0115/hwang4/projects/deepwind/runs/slurm-logs/%x-%j.err
+#SBATCH --output=slurm-logs/%x-%j.out
+#SBATCH --error=slurm-logs/%x-%j.err
 #SBATCH --job-name=deepwind-data-audit
 #SBATCH --partition=copy
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --time=04:00:00
-#SBATCH --account=pawsey0115
+#SBATCH --account=YOUR_PROJECT
 
 set -euo pipefail
 module load pytorch/2.7.1-rocm6.3.3

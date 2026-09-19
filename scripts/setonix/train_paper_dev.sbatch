@@ -1,6 +1,6 @@
 #!/bin/bash --login
-#SBATCH --output=/scratch/pawsey0115/hwang4/projects/deepwind/runs/slurm-logs/%x-%j.out
-#SBATCH --error=/scratch/pawsey0115/hwang4/projects/deepwind/runs/slurm-logs/%x-%j.err
+#SBATCH --output=slurm-logs/%x-%j.out
+#SBATCH --error=slurm-logs/%x-%j.err
 #SBATCH --job-name=dw-paper-dev
 #SBATCH --partition=gpu-dev
 #SBATCH --nodes=2
@@ -8,7 +8,7 @@
 #SBATCH --gpus-per-node=8
 #SBATCH --exclusive
 #SBATCH --time=03:50:00
-#SBATCH --account=pawsey0115-gpu
+#SBATCH --account=YOUR_PROJECT-gpu
 #SBATCH --export=ALL
 
 # ---------------------------------------------------------------------------
@@ -62,10 +62,10 @@ OVERRIDES="${OVERRIDES} ${DEEPWIND_TRAIN_OVERRIDES:-}"
 export DEEPWIND_SAVE_DEADLINE="$(( $(date +%s) + ${DEEPWIND_SAVE_AFTER:-13680} ))"
 
 # --- Paths (self-contained; DEEPWIND_* are NOT in ~/.bashrc) ---------------
-export DEEPWIND_PROJECT_ROOT="${DEEPWIND_PROJECT_ROOT:-/software/projects/pawsey0115/hwang4/research_projects/DeepWind}"
-export DEEPWIND_DATA_ROOT="${DEEPWIND_DATA_ROOT:-/scratch/pawsey0115/hwang4/deepwindData}"
-export DEEPWIND_RUNS_ROOT="${DEEPWIND_RUNS_ROOT:-/scratch/pawsey0115/hwang4/projects/deepwind/runs}"
-export DEEPWIND_VENV="${DEEPWIND_VENV:-/scratch/pawsey0115/hwang4/conda_envs/deepwind}"
+export DEEPWIND_PROJECT_ROOT="${DEEPWIND_PROJECT_ROOT:-$MYSOFTWARE/research_projects/DeepWind}"
+export DEEPWIND_DATA_ROOT="${DEEPWIND_DATA_ROOT:-$MYSCRATCH/deepwindData}"
+export DEEPWIND_RUNS_ROOT="${DEEPWIND_RUNS_ROOT:-$MYSCRATCH/projects/deepwind/runs}"
+export DEEPWIND_VENV="${DEEPWIND_VENV:-$MYSCRATCH/conda_envs/deepwind}"
 
 # --- Run identity: FIXED name => deterministic resume across chunks --------
 run_name="${DEEPWIND_RUN_NAME:-deepwind-${MODEL}-paper-seed42}"

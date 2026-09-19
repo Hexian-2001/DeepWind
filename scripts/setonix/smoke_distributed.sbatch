@@ -1,6 +1,6 @@
 #!/bin/bash --login
-#SBATCH --output=/scratch/pawsey0115/hwang4/projects/deepwind/runs/slurm-logs/%x-%j.out
-#SBATCH --error=/scratch/pawsey0115/hwang4/projects/deepwind/runs/slurm-logs/%x-%j.err
+#SBATCH --output=slurm-logs/%x-%j.out
+#SBATCH --error=slurm-logs/%x-%j.err
 #SBATCH --job-name=deepwind-ddp-smoke
 #SBATCH --partition=gpu-dev
 #SBATCH --nodes=2
@@ -8,7 +8,7 @@
 #SBATCH --gpus-per-node=2
 #SBATCH --exclusive
 #SBATCH --time=00:30:00
-#SBATCH --account=pawsey0115-gpu
+#SBATCH --account=YOUR_PROJECT-gpu
 
 set -euo pipefail
 module load pytorch/2.7.1-rocm6.3.3

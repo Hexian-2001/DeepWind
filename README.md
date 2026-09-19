@@ -19,7 +19,7 @@
 
 ## What is DeepWind?
 
-DeepWind is a decoder-only Transformer pre-trained on **~562 billion wind
+DeepWind is a decoder-only Transformer pre-trained on **560 billion wind
 observations** drawn from 20 sources (WIND Toolkit + 19 real-world SCADA
 collections). It forecasts wind power **zero-shot**: point it at a site it has
 *never* seen, feed it a window of history — power, plus whatever weather
@@ -51,18 +51,27 @@ attention + sparse mixture-of-experts + autoregressive multi-quantile decoding.*
 
 | Model | Params | Zero-shot nCRPS ↓ | Checkpoint |
 |---|---|---|---|
-| **DeepWind1.0-33M** · small | 33.21 M | 0.0998 | [🤗 `Hexian-2001/DeepWind1.0-33M`](https://huggingface.co/Hexian-2001/DeepWind1.0-33M) |
-| **DeepWind1.0-890M** · base | 888.24 M | 0.0961 | [🤗 `Hexian-2001/DeepWind1.0-890M`](https://huggingface.co/Hexian-2001/DeepWind1.0-890M) |
-| **DeepWind1.0-1.3B** · large | ~1.33 B | 0.0671 † | [🤗 `Hexian-2001/DeepWind1.0-1.3B`](https://huggingface.co/Hexian-2001/DeepWind1.0-1.3B) |
+| **DeepWind1.0-33M** · small | ~33 M | 0.0921 | [🤗 `Hexian-2001/DeepWind1.0-33M`](https://huggingface.co/Hexian-2001/DeepWind1.0-33M) |
+| **DeepWind1.0-890M** · base | ~890 M | 0.0845 | [🤗 `Hexian-2001/DeepWind1.0-890M`](https://huggingface.co/Hexian-2001/DeepWind1.0-890M) |
+| **DeepWind1.0-1.3B** · large | ~1.3 B | 0.0834 | [🤗 `Hexian-2001/DeepWind1.0-1.3B`](https://huggingface.co/Hexian-2001/DeepWind1.0-1.3B) |
 
-> † `large` is the recovered paper checkpoint; its number is from the paper's
-> original evaluation protocol. `small` and `base` are scored under the unified
-> protocol described in [Results](#results).
+> nCRPS is the arithmetic mean over the six forecasting horizons (1–12 h),
+> each of which is itself the mean across the eight WindBench datasets — the
+> paper's zero-shot protocol. The horizon-by-horizon breakdown is in
+> [Results](#results).
 
 All three sizes share **exactly the same interface** — swap the checkpoint
-string and nothing else in your code changes. Pick by compute budget: `small`
-runs happily on a laptop GPU, `base` is the recommended default, `large` is for
-when you can afford it.
+string and nothing else in your code changes. They differ only in depth, width,
+and MoE size:
+
+- **Base (~890M)** is the recommended default. It is the strongest overall,
+  taking first place on **21 of the 24** metric×horizon cells in the paper's
+  head-to-head against foundation-model baselines.
+- **Large (~1.3B)** is the non-monotonic one — it edges ahead of Base at the
+  long horizons (8–12 h) but does *not* win across the board, so reach for it
+  when long-horizon skill matters and you can afford the extra compute.
+- **Small (~33M)** runs happily on a laptop GPU — good for a quick sanity check
+  or a few-shot adapter.
 
 ## 🏗️ Architecture
 
@@ -98,7 +107,7 @@ when you can afford it.
 | patch size / stride | 16 / 16 | 16 / 16 | 16 / 16 |
 | context window | 8192 | 8192 | 8192 |
 | output quantiles | 21 | 21 | 21 |
-| **trainable params** | **33.21 M** | **888.24 M** | **1.33 B** |
+| **trainable params** | **~33 M** | **~890 M** | **~1.3 B** |
 
 Shared by all variants: RMSNorm, arcsinh normalisation, RoPE + xPOS positional
 encoding, coordinate embedding, and a 21-quantile prediction head.
@@ -124,7 +133,7 @@ pip install -e ".[dev]"
 
 DeepWind reads a **2-D `.npy` array of shape `(channels, time)`** plus a small
 CSV that says where the site is and which variable each row is. You don't have a
-wind farm lying around? Generate one — it takes three lines of NumPy:
+wind farm lying around? Generate one — it takes a few lines of NumPy:
 
 ```python
 import numpy as np
@@ -156,6 +165,43 @@ pd.DataFrame([{
 }]).to_csv("my_metadata.csv", index=False)
 ```
 
+### 2b. Load the model and forecast straight from the fake site
+
+Here's the whole forward path — build the input batch exactly the way `infer.py`
+does, load the checkpoint, and ask for **any number of future steps** (the
+horizon is not hard-coded):
+
+```python
+from pathlib import Path
+import numpy as np, torch
+from omegaconf import OmegaConf
+from src.data.datasets import MetadataStore, _pad_and_mask
+from src.inference.pipeline import InferencePipeline
+
+# A tiny Hydra config — the pipeline only needs a context length and flags.
+cfg = OmegaConf.create({
+    "data": {"context_length": 512, "max_vars": 6, "pad_val_id": 10},
+    "inference": {"adapter_path": None, "use_amp": False, "inference_quantiles": None},
+})
+
+# Build the batch from the .npy + metadata, byte-for-byte like infer.py does.
+meta   = MetadataStore("my_metadata.csv").get("my_site.npy")
+window = np.load("my_site.npy", mmap_mode="r").astype(np.float32)[:, -512:]
+sample = _pad_and_mask(window, meta, 6, 512, 10)
+batch  = {k: torch.from_numpy(v).unsqueeze(0) for k, v in sample.items()}
+
+# Load the base checkpoint and forecast 192 steps (= 16 h at 5-min).
+pipeline = InferencePipeline(checkpoint_path="Hexian-2001/DeepWind1.0-890M", cfg=cfg)
+out = pipeline.predict(batch, pred_len=192)
+
+out.point_preds.shape      # (1, 6, 192)     median forecast, per channel
+out.quantile_preds.shape   # (1, 6, 192, 21) all 21 quantiles
+power_forecast = out.point_preds[0, 0]       # channel 0 = power
+```
+
+Change `pred_len` to `96`, `288`, `12` — whatever your horizon is. The forecaster
+decodes it patch-wise (16 steps at a time) and trims to exactly what you asked.
+
 ### 3. Forecast
 
 ```bash
@@ -164,8 +210,20 @@ python infer.py \
   inference.checkpoint_path=Hexian-2001/DeepWind1.0-890M \
   data.npy_path=my_site.npy \
   data.metadata_path=my_metadata.csv \
+  inference.prediction_length=96 \      # any integer; default 96 (12 h at 5-min)
+  data.context_length=8192 \            # default; shrink to 512 for a CPU smoke test
+  inference.use_amp=true \
   output.output_path=my_forecast.npz
 ```
+
+| knob | default | what it does |
+|---|---|---|
+| `inference.prediction_length` | 96 | forecast horizon in steps — **any integer** |
+| `data.context_length` | 8192 | context window in steps (trade speed for context) |
+| `inference.use_amp` | true | BF16 autocast on CUDA (no-op on CPU) |
+| `inference.mqd_infer` | false | expand-collapse multi-quantile decoding (slower, sharper) |
+| `inference.adapter_path` | null | merge a fine-tuned LoRA adapter at load time |
+| `output.save_json` | true | also write a human-readable JSON next to the NPZ |
 
 That writes `my_forecast.npz` with:
 
@@ -212,8 +270,10 @@ contract.
 - You may have **fewer** than 6 channels. A SCADA turbine that only logs power +
   wind speed is a `(2, T)` array — the loader pads the rest to 6 and masks them
   out. A site with power only is a `(1, T)` array.
-- The model reads the **last `context_length` (= 8192) steps** as context and
-  predicts the next `prediction_length` (= 96) steps.
+- The model reads the last `context_length` steps as context and generates the
+  next `prediction_length` steps. **Neither is hard-coded**: `prediction_length`
+  can be any integer (see the quick start), and `context_length` defaults to
+  8192 but can be shortened to trade context for speed.
 
 ### Input: one `metadata.csv`
 
@@ -268,6 +328,16 @@ python finetune.py \
 | `data.stride` | 16 | step between context windows |
 | `data.finetune_rate` | 1.0 | keep a fraction of windows (few-shot) |
 
+**What actually trains:** the low-rank adapters on the variate-attention
+projections, plus the MoE router and the quantile head. Everything else stays
+frozen, so the adapter is a few MB and gradients are cheap. This is the same
+few-shot strategy the paper uses to cold-start newly commissioned farms.
+
+**Compute:** modest — because most of the model is frozen, a single site
+typically fine-tunes in well under an hour on one modern GPU. The exact time
+scales with the number of windows (`stride` × `finetune_rate` × epochs), so
+drop `finetune_rate` or `num_train_epochs` for a quicker sweep.
+
 The result is a LoRA adapter directory. Use it at inference by adding
 `inference.adapter_path=/path/to/adapter` — the pipeline merges it into the
 base weights and unloads the scaffolding, so the serving path is identical.
@@ -297,14 +367,33 @@ python train.py \
 
 Model variants live in `configs/model/` (`deepwind_small`, `deepwind_base`,
 `deepwind_large`); training schedules in `configs/training/`. The paper
-protocol — global batch 256, 100,000 steps, peak LR `1e-4`, 3% warmup, cosine
-decay, BF16 — is encoded in those files and needs no flags.
+protocol — global batch 256, 100,000 steps, peak LR `1e-4`, 3,000-step linear
+warmup, cosine decay, BF16, gradient clip 1.0, AdamW (β₁=0.9, β₂=0.95, weight
+decay 0.01) — is encoded in those files and needs no flags.
 
 Corpus design matters more than the model: DeepWind was trained with **0.7
 synthetic (WIND Toolkit) / 0.3 real (SCADA)** sampling weights, and each site's
 channels are labelled with `variate_ids` so the variate embedding can transfer
 across sources. See `configs/data/train.yaml` for the knobs (balanced sampling,
 adaptive windowing, and the Phase-1 sim-to-real augmentation).
+
+### What full reproduction costs
+
+From the paper (16× AMD Instinct MI250X, 64 GB each, BF16, global batch 256,
+100k steps):
+
+| Variant | Params | Wall time | GPU-hours | Peak VRAM (BS=1) | Throughput (BS=16) |
+|---|---|---|---|---|---|
+| Small | ~33 M | 13.3 h | 213 | 0.28 GB | 148 samples/s |
+| Base | ~890 M | 56.5 h | 903 | 2.04 GB | 25.8 samples/s |
+| Large | ~1.3 B | 82.7 h | 1323 | 5.65 GB | 10.7 samples/s |
+
+So a Small reproduction is a single overnight run on a 16-GPU node; Base is ~2.5
+days; Large is ~3.5 days. On fewer GPUs the wall time scales up roughly linearly
+(the effective batch size must stay at 256 via gradient accumulation). The
+corpus itself — 560 billion observations across 20 sources — is the expensive
+part to assemble; the Shanxi Wind SCADA source is proprietary and not
+redistributed, which is why only WIND Toolkit is shipped for re-training.
 
 On Pawsey Setonix, the job templates under `scripts/setonix/` are
 account-portable — they resolve run/data/venv/project roots from `$MYSCRATCH`
@@ -313,22 +402,43 @@ account and create `slurm-logs/` before a direct `sbatch`.
 
 ## 📊 Results
 
-Zero-shot evaluation on **WindBench** (8 datasets × 6 horizons, 1–12 h),
-macro-averaged. Lower is better for ↓, higher for ↑.
+Zero-shot evaluation on **WindBench** (8 datasets × 6 horizons), as reported in
+the paper. Each cell is the arithmetic mean across the eight datasets; lower is
+better for nCRPS and nMAE.
 
-**DeepWind1.0-890M (base)** — the recommended default:
+**nCRPS ↓** (probabilistic):
 
-| Metric | Value |
-|---|---|
-| nCRPS ↓ | 0.0961 |
-| nMAE ↓ | 0.1211 |
-| MAE_Coverage | 0.1229 |
-| Accuracy ↑ | 0.8097 |
-| Qualified_Rate ↑ | 0.8001 |
-| R² ↑ | 0.6430 |
-| mean_wQuantileLoss ↓ | 0.2667 |
+| Horizon | Small | Base | Large |
+|---|---|---|---|
+| 1 h | 0.0425 | 0.0402 | 0.0400 |
+| 2 h | 0.0648 | 0.0625 | 0.0638 |
+| 4 h | 0.0925 | 0.0890 | 0.0920 |
+| 6 h | 0.1075 | 0.0950 | 0.1013 |
+| 8 h | 0.1175 | 0.1072 | 0.1004 |
+| 12 h | 0.1275 | 0.1130 | 0.1030 |
+| **mean** | **0.0921** | **0.0845** | **0.0834** |
 
-**DeepWind1.0-33M (small)** — 0.0998 nCRPS (see its [model card](https://huggingface.co/Hexian-2001/DeepWind1.0-33M) for the full table). **DeepWind1.0-1.3B (large)** — 0.0671 nCRPS under the paper's original protocol.
+**nMAE ↓** (point):
+
+| Horizon | Small | Base | Large |
+|---|---|---|---|
+| 1 h | 0.0579 | 0.0543 | 0.0563 |
+| 2 h | 0.0804 | 0.0744 | 0.0784 |
+| 4 h | 0.1107 | 0.0990 | 0.1055 |
+| 6 h | 0.1319 | 0.1140 | 0.1223 |
+| 8 h | 0.1478 | 0.1267 | 0.1360 |
+| 12 h | 0.1741 | 0.1438 | 0.1572 |
+| **mean** | **0.1171** | **0.1020** | **0.1093** |
+
+Two takeaways from the paper:
+
+1. **DeepWind-Base beats every foundation-model baseline** (Chronos-2,
+   TimesFM-2.5, TiRex, Moirai-2) at every horizon, and — zero-shot — still
+   outperforms full-shot supervised baselines (DeepAR, LGBM, PatchTST, …) on the
+   same benchmark.
+2. **Scaling is non-monotonic.** Large doesn't strictly dominate Base: it wins
+   at 8–12 h but loses at shorter horizons, which is why Base is the recommended
+   default and Large is the long-horizon specialist.
 
 ## 📁 Repository layout
 

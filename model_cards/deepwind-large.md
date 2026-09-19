@@ -20,17 +20,16 @@ forecasting, introduced in
 > forecasting," *Energy*, vol. 360, 141793, 2026.
 > https://doi.org/10.1016/j.energy.2026.141793
 
-This is the recovered final paper checkpoint — the largest and most accurate
-member of the family. It issues a 21-quantile forecast directly from a
-historical power context and, when available, meteorological covariates and site
-coordinates.
+This is the recovered final paper checkpoint — the largest member of the family.
+It issues a 21-quantile forecast directly from a historical power context and,
+when available, meteorological covariates and site coordinates.
 
 ## Model description
 
 - **Architecture:** decoder-only Transformer with time-aware patching, decoupled
   time/variate attention (xPOS), sparse top-2 mixture-of-experts layers, and a
   direct multi-quantile prediction head.
-- **Scale:** ~1.33B trainable parameters (18 layers, hidden 1024, 16 heads,
+- **Scale:** ~1.3B trainable parameters (18 layers, hidden 1024, 16 heads,
   SwiGLU width 2816, 8 experts).
 - **Output:** 21 quantiles (0.01–0.99) per site and horizon.
 
@@ -71,7 +70,7 @@ python infer.py \
 | quantiles | 21 (0.01–0.99) |
 | normalization | RMSNorm + arcsinh |
 | positional encoding | xPOS (RoPE disabled in the recovered config) |
-| trainable parameters | ~1.33 B |
+| trainable parameters | ~1.3 B |
 
 > The recovered checkpoint records `use_rotary_emb=false` and
 > `aux_loss_weight=0.01`, which differs from the paper text's RoPE/xPOS and
@@ -79,24 +78,28 @@ python infer.py \
 
 ## Training
 
-Trained with AdamW (β₁=0.9, β₂=0.95), peak learning rate `1e-4`, 3% linear
-warmup, cosine decay, weight decay `0.01`, gradient clipping at `1.0`, BF16,
-and a global batch size of 256 for 100,000 steps.
+Trained with AdamW (β₁=0.9, β₂=0.95), peak learning rate `1e-4`, 3,000-step
+linear warmup, cosine decay, weight decay `0.01`, gradient clipping at `1.0`,
+BF16, and a global batch size of 256 for 100,000 steps.
 
 ## Evaluation
 
-Zero-shot results on WindBench (8 datasets × 6 horizons), macro-averaged, under
-the paper's original evaluation protocol:
+Zero-shot results on WindBench (8 datasets), as reported in the paper. Each
+horizon is the arithmetic mean across the eight datasets:
 
-| Metric | Value |
-|---|---|
-| nCRPS ↓ | 0.0671 |
-| nMAE ↓ | 0.0976 |
-| MAE_Coverage | 0.0488 |
-| Accuracy ↑ | 0.8413 |
-| Qualified_Rate ↑ | 0.8899 |
-| R² ↑ | 0.7334 |
-| mean_wQuantileLoss ↓ | 0.1946 |
+| Horizon | nCRPS ↓ | nMAE ↓ |
+|---|---|---|
+| 1 h | 0.0400 | 0.0563 |
+| 2 h | 0.0638 | 0.0784 |
+| 4 h | 0.0920 | 0.1055 |
+| 6 h | 0.1013 | 0.1223 |
+| 8 h | 0.1004 | 0.1360 |
+| 12 h | 0.1030 | 0.1572 |
+| **mean** | **0.0834** | **0.1093** |
+
+Note the non-monotonic scaling: Large edges ahead of Base at the long horizons
+(8–12 h) but does not dominate across the board — Base remains the recommended
+default.
 
 ## Limitations
 

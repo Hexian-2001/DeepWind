@@ -12,7 +12,7 @@ tags:
 
 # DeepWind1.0-33M
 
-DeepWind1.0-33M is the 33M-parameter **small** checkpoint of **DeepWind**, a
+DeepWind1.0-33M is the ~33M-parameter **small** checkpoint of **DeepWind**, a
 decoder-only Transformer foundation model for zero-shot probabilistic wind-power
 forecasting, introduced in
 
@@ -29,8 +29,8 @@ context and, when available, meteorological covariates and site coordinates.
 - **Architecture:** decoder-only Transformer with time-aware patching, decoupled
   time/variate attention (RoPE + xPOS), sparse top-2 mixture-of-experts layers,
   and a direct multi-quantile prediction head.
-- **Scale:** 33.21M trainable parameters (6 layers, hidden 384, 6 heads,
-  SwiGLU width 1024, 4 experts).
+- **Scale:** ~33M trainable parameters (6 layers, hidden 384, 6 heads, SwiGLU
+  width 1024, 4 experts).
 - **Output:** 21 quantiles (0.01–0.99) per site and horizon.
 - **Loss:** trained with a **power-only channel loss** (`channel_loss_weights =
   [1, 0, 0, 0, 0, 0]`), i.e. the objective concentrates gradient on the power
@@ -73,30 +73,28 @@ python infer.py \
 | quantiles | 21 (0.01–0.99) |
 | normalization | RMSNorm + arcsinh |
 | positional encoding | RoPE + xPOS |
-| trainable parameters | 33.21 M |
+| trainable parameters | ~33 M |
 
 ## Training
 
-Trained with AdamW (β₁=0.9, β₂=0.95), peak learning rate `1e-4`, 3% linear
-warmup, cosine decay, weight decay `0.01`, gradient clipping at `1.0`, BF16, and
-a global batch size of 256 for 100,000 steps. This snapshot is from an
-intermediate checkpoint (the final `checkpoint-100000` release follows when
-training completes).
+Trained with AdamW (β₁=0.9, β₂=0.95), peak learning rate `1e-4`, 3,000-step
+linear warmup, cosine decay, weight decay `0.01`, gradient clipping at `1.0`,
+BF16, and a global batch size of 256 for 100,000 steps.
 
 ## Evaluation
 
-Zero-shot results on WindBench (8 datasets × 6 horizons), macro-averaged,
-evaluated at an intermediate checkpoint:
+Zero-shot results on WindBench (8 datasets), as reported in the paper. Each
+horizon is the arithmetic mean across the eight datasets:
 
-| Metric | Value |
-|---|---|
-| nCRPS ↓ | 0.0998 |
-| nMAE ↓ | 0.1295 |
-| MAE_Coverage | 0.1131 |
-| Accuracy ↑ | 0.8030 |
-| Qualified_Rate ↑ | 0.7799 |
-| R² ↑ | 0.6175 |
-| mean_wQuantileLoss ↓ | 0.2812 |
+| Horizon | nCRPS ↓ | nMAE ↓ |
+|---|---|---|
+| 1 h | 0.0425 | 0.0579 |
+| 2 h | 0.0648 | 0.0804 |
+| 4 h | 0.0925 | 0.1107 |
+| 6 h | 0.1075 | 0.1319 |
+| 8 h | 0.1175 | 0.1478 |
+| 12 h | 0.1275 | 0.1741 |
+| **mean** | **0.0921** | **0.1171** |
 
 ## Limitations
 

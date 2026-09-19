@@ -15,6 +15,14 @@ dataset_weights:
   windtoolkit: 0.7
   scada: 0.3
 
+# ---- Sim2real augmentation (Phase 1) ----
+augment:
+  enabled: false
+  target: windtoolkit      # dataset tag to augment (synthetic only)
+  noise_relative: 0.0      # heteroscedastic noise: sigma = noise_relative * power
+  curtailment_prob: 0.0    # per-window prob of capping a segment below rated
+  downtime_prob: 0.0       # per-window prob of zeroing a segment (fault/maintenance)
+
 # ---- Adaptive windowing ----
 sample_ratio: 0.005
 min_windows_per_file: 4

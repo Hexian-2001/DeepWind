@@ -210,6 +210,51 @@ def _pad_and_mask(
     }
 
 
+def _augment_power(
+    power: np.ndarray,
+    rng: np.random.Generator,
+    aug_cfg: Dict[str, Any],
+) -> np.ndarray:
+    # Sim2real augmentation of a single power series (channel 0).
+    # Injects heteroscedastic noise + curtailment + downtime into synthetic
+    # WIND Toolkit power so its distribution approaches real SCADA. This adds
+    # the aleatoric uncertainty the deterministic synthetic data lacks (the
+    # root cause of Phase 0 overconfidence / MAE_Coverage).
+    p = power.astype(np.float32)
+    L = p.shape[0]
+    if L == 0:
+        return p
+
+    capacity = float(np.max(p))
+    if not np.isfinite(capacity) or capacity <= 0.0:
+        capacity = 1.0
+
+    # 1. Heteroscedastic sensor/turbulence noise: sigma scales with power.
+    eta = float(aug_cfg.get("noise_relative", 0.0))
+    if eta > 0.0:
+        p = p + rng.normal(0.0, eta * np.abs(p), size=L)
+        p = np.clip(p, 0.0, None)
+
+    # 2. Curtailment: cap a random contiguous segment below rated (plateau).
+    curt_prob = float(aug_cfg.get("curtailment_prob", 0.0))
+    if curt_prob > 0.0 and rng.random() < curt_prob:
+        seg_len = int(rng.integers(24, min(577, L) + 1))  # 2h .. 48h @5min
+        seg_len = min(seg_len, L)
+        start = int(rng.integers(0, max(L - seg_len, 1) + 1))
+        cap_level = float(rng.uniform(0.6, 0.95)) * capacity
+        p[start : start + seg_len] = np.minimum(p[start : start + seg_len], cap_level)
+
+    # 3. Downtime: zero a random contiguous segment (maintenance / fault).
+    down_prob = float(aug_cfg.get("downtime_prob", 0.0))
+    if down_prob > 0.0 and rng.random() < down_prob:
+        seg_len = int(rng.integers(6, min(301, L) + 1))  # 30min .. 25h @5min
+        seg_len = min(seg_len, L)
+        start = int(rng.integers(0, max(L - seg_len, 1) + 1))
+        p[start : start + seg_len] = 0.0
+
+    return p
+
+
 # ===================================================================
 #  Training Dataset
 # ===================================================================
@@ -264,6 +309,8 @@ class DeepWindTrainDataset(IterableDataset):
         max_windows_per_file: int = 128,
         # ---- IO strategy ----
         full_read_coverage_threshold: float = 0.3,
+        # ---- Sim2real augmentation (Phase 1) ----
+        augment: Optional[Dict[str, Any]] = None,
         # ---- Iteration ----
         repeat: bool = True,
         seed: int = 42,
@@ -309,6 +356,8 @@ class DeepWindTrainDataset(IterableDataset):
         self.coverage_thresh = full_read_coverage_threshold
         self.repeat = repeat
         self.seed = seed
+        self.augment = augment or {}
+        self._augment_enabled = bool(self.augment.get("enabled", False))
 
         # Metadata
         self.meta = MetadataStore(metadata_path)
@@ -378,6 +427,17 @@ class DeepWindTrainDataset(IterableDataset):
         n = int(n_cand * self.sample_ratio)
         return int(np.clip(n, self.min_windows, self.max_windows))
     
+    def _augment_window(self, window: np.ndarray, rng, tag: str) -> np.ndarray:
+        # Augment channel 0 (power) of a sampled window; no-op when disabled.
+        # Only the synthetic "windtoolkit" group is augmented -- real SCADA
+        # already carries natural noise/curtailment/downtime. Disabled returns
+        # the input unchanged (no copy on the hot path).
+        if not self._augment_enabled or tag != self.augment.get("target", "windtoolkit"):
+            return window
+        out = window.copy()
+        out[0] = _augment_power(window[0], rng, self.augment)
+        return out
+
     def _generate_from_file(
         self,
         path: Path,
@@ -417,14 +477,15 @@ class DeepWindTrainDataset(IterableDataset):
             buf = values.astype(np.float32)
             for s in starts:
                 yield _pad_and_mask(
-                    buf[:, s : s + self.seq_len],
+                    self._augment_window(buf[:, s : s + self.seq_len], file_rng, meta["dataset_tag"]),
                     meta, self.max_vars, self.seq_len, self.pad_val_id,
                 )
         else:
             for s in starts:
                 w = values[:, s : s + self.seq_len].astype(np.float32)
                 yield _pad_and_mask(
-                    w, meta, self.max_vars, self.seq_len, self.pad_val_id,
+                    self._augment_window(w, file_rng, meta["dataset_tag"]),
+                    meta, self.max_vars, self.seq_len, self.pad_val_id,
                 )
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:

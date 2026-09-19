@@ -1,4 +1,16 @@
-# DeepWind
+<div align="center">
+
+<img src="assets/deepwind-logo.png" alt="DeepWind logo" width="150">
+
+# DeepWind: A Foundation Model for Zero-Shot Wind Power Forecasting
+
+**Domain foundation model for probabilistic wind power forecasting**
+
+[![status](https://img.shields.io/badge/status-released-blue)](#release-status)
+[![HF model](https://img.shields.io/badge/%F0%9F%A4%97%20Model-DeepWind1.0--890M-FFD21E)](https://huggingface.co/Hexian-2001/DeepWind1.0-890M)
+[![license](https://img.shields.io/badge/License-Apache--2.0-green.svg)](LICENSE)
+
+</div>
 
 DeepWind is a domain foundation model for zero-shot probabilistic wind-power
 forecasting. It uses time-aware patching, decoupled time/variate attention,
@@ -12,11 +24,52 @@ This repository is the reproducibility implementation for:
 
 ## Release status
 
-The `release/open-source-v1` branch is being prepared from the exact training
-and evaluation code used for the paper. Model logic is frozen while packaging,
-tests, manifests, portable paths, and documentation are added. Public model
-weights will contain inference weights and their exact saved `config.json`, not
-optimizer states or private infrastructure paths.
+| Size | Params | Status |
+|---|---|---|
+| DeepWind1.0-890M (base) | 888.24 M | ✅ Released — [🤗 `Hexian-2001/DeepWind1.0-890M`](https://huggingface.co/Hexian-2001/DeepWind1.0-890M) |
+| DeepWind-small | 33.21 M | ⏳ Releasing after final training |
+| DeepWind-large | ~1.3 B | ⏳ Releasing after final training |
+
+Public model weights contain inference weights and their exact saved
+`config.json`, not optimizer states or private infrastructure paths.
+
+## Quick start
+
+Install the code and load the released base model:
+
+```bash
+pip install git+https://github.com/Hexian-2001/DeepWind.git
+```
+
+```python
+from src.models.deepwind import DeepWindModel
+
+model = DeepWindModel.from_pretrained("Hexian-2001/DeepWind1.0-890M")
+```
+
+Run zero-shot forecasting with `src/inference/infer.py`, or reproduce the
+evaluation with:
+
+```bash
+python evaluate.py \
+  inference.checkpoint_path=Hexian-2001/DeepWind1.0-890M \
+  run_name=my-evaluation
+```
+
+## Results
+
+Zero-shot results on WindBench (8 datasets × 6 horizons), macro-averaged
+mean. Lower is better for ↓, higher for ↑:
+
+| Metric | DeepWind1.0-890M |
+|---|---|
+| nCRPS ↓ | 0.0961 |
+| nMAE ↓ | 0.1211 |
+| MAE_Coverage | 0.1229 |
+| Accuracy ↑ | 0.8097 |
+| Qualified_Rate ↑ | 0.8001 |
+| R² ↑ | 0.6430 |
+| mean_wQuantileLoss ↓ | 0.2667 |
 
 ## Repository layout
 
@@ -28,6 +81,7 @@ test/           Unit, integration, and data-pipeline checks
 reproduction/   Scripts used to reproduce paper analyses and figures
 tools/          Result collection and operational utilities
 docs/           Data, reproducibility, release, and architecture notes
+model_cards/    Per-checkpoint model cards (also published on the Hub)
 ```
 
 Large datasets, checkpoints, logs, and experiment outputs are deliberately not
@@ -87,13 +141,17 @@ sbatch scripts/setonix/smoke.sbatch
 
 ## Reproducibility notes
 
-The recovered final checkpoint configuration differs from two statements in
-the published method description: it records `use_rotary_emb=false` and
-`aux_loss_weight=0.01`. The paper describes RoPE/xPOS and reports 0.02. Both
-the published specification and the actual checkpoint configuration are kept
-explicitly; see [docs/reproducibility.md](docs/reproducibility.md).
+The recovered *large* final checkpoint configuration differs from two
+statements in the published method description: it records
+`use_rotary_emb=false` and `aux_loss_weight=0.01`. The paper describes
+RoPE/xPOS and reports 0.02. The released base model
+(`Hexian-2001/DeepWind1.0-890M`) uses the paper configuration
+(`use_rotary_emb=true`, `aux_loss_weight=0.02`). Both the published
+specification and the actual checkpoint configurations are kept explicitly;
+see [docs/reproducibility.md](docs/reproducibility.md).
 
 ## License and citation
 
-Code is released under the Apache License 2.0. Dataset licenses and model-weight
-terms must be handled separately. Please cite the paper using `CITATION.cff`.
+Code is released under the Apache License 2.0. Model weights are released under
+Apache-2.0; dataset licenses must be handled separately. Please cite the paper
+using `CITATION.cff`.

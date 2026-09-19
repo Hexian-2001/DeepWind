@@ -1,0 +1,48 @@
+<svg width="220" height="220" viewBox="0 0 220 220" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">DeepWind logo</title>
+  <desc id="desc">A wind turbine, probabilistic forecast band, and DW monogram for the DeepWind wind power forecasting model.</desc>
+  <defs>
+    <linearGradient id="sky" x1="30" y1="22" x2="184" y2="198" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EAF7FF"/>
+      <stop offset="1" stop-color="#F8FBF8"/>
+    </linearGradient>
+    <linearGradient id="band" x1="50" y1="133" x2="178" y2="105" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#68C7C1" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#2E7DD7" stop-opacity="0.35"/>
+    </linearGradient>
+    <linearGradient id="stroke" x1="56" y1="128" x2="177" y2="99" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0E9F8F"/>
+      <stop offset="1" stop-color="#155DBA"/>
+    </linearGradient>
+    <filter id="shadow" x="12" y="12" width="196" height="196" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#0A3054" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+
+  <circle cx="110" cy="110" r="91" fill="url(#sky)" filter="url(#shadow)"/>
+  <circle cx="110" cy="110" r="91" stroke="#C6E4EF" stroke-width="2"/>
+
+  <!-- Forecast interval and median trajectory -->
+  <path d="M48 126C64 114 78 119 92 110C107 100 121 99 136 88C153 76 169 83 184 70V104C169 118 154 112 138 124C122 136 107 135 92 145C76 156 62 151 48 163V126Z" fill="url(#band)"/>
+  <path d="M48 145C63 133 78 137 93 127C108 117 121 118 137 105C153 93 169 100 184 88" stroke="url(#stroke)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Wind turbine -->
+  <g stroke="#173B57" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M89 160L99 84L109 160" stroke-width="6"/>
+    <circle cx="99" cy="84" r="7.5" fill="#F8FBF8" stroke-width="4"/>
+    <path d="M99 84L99 42" stroke-width="5"/>
+    <path d="M99 84L64 103" stroke-width="5"/>
+    <path d="M99 84L134 103" stroke-width="5"/>
+  </g>
+
+  <!-- Model mark -->
+  <g>
+    <rect x="64" y="152" width="93" height="32" rx="16" fill="#173B57"/>
+    <text x="110.5" y="174" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="800" letter-spacing="1.5" fill="#FFFFFF">DW</text>
+  </g>
+
+  <!-- Subtle wind lines -->
+  <path d="M47 58H73" stroke="#67B7C9" stroke-width="4" stroke-linecap="round"/>
+  <path d="M139 52H170" stroke="#67B7C9" stroke-width="4" stroke-linecap="round"/>
+  <path d="M151 65H178" stroke="#A3D7DE" stroke-width="3" stroke-linecap="round"/>
+</svg>

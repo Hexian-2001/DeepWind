@@ -6,7 +6,6 @@
 
 **Domain foundation model for probabilistic wind power forecasting**
 
-[![status](https://img.shields.io/badge/status-released-blue)](#release-status)
 [![HF model](https://img.shields.io/badge/%F0%9F%A4%97%20Model-DeepWind1.0--890M-FFD21E)](https://huggingface.co/Hexian-2001/DeepWind1.0-890M)
 [![license](https://img.shields.io/badge/License-Apache--2.0-green.svg)](LICENSE)
 
@@ -16,22 +15,17 @@ DeepWind is a domain foundation model for zero-shot probabilistic wind-power
 forecasting. It uses time-aware patching, decoupled time/variate attention,
 sparse mixture-of-experts layers, and autoregressive multi-quantile decoding.
 
-This repository is the reproducibility implementation for:
+This repository is the reference implementation for:
 
 > H. Wang et al., "DeepWind: A foundation model for zero-shot wind power
 > forecasting," *Energy*, vol. 360, 141793, 2026.
 > https://doi.org/10.1016/j.energy.2026.141793
 
-## Release status
+## Models
 
-| Size | Params | Status |
+| Model | Params | Checkpoint |
 |---|---|---|
-| DeepWind1.0-890M (base) | 888.24 M | ✅ Released — [🤗 `Hexian-2001/DeepWind1.0-890M`](https://huggingface.co/Hexian-2001/DeepWind1.0-890M) |
-| DeepWind-small | 33.21 M | ⏳ Releasing after final training |
-| DeepWind-large | ~1.3 B | ⏳ Releasing after final training |
-
-Public model weights contain inference weights and their exact saved
-`config.json`, not optimizer states or private infrastructure paths.
+| DeepWind1.0-890M (base) | 888.24 M | [🤗 `Hexian-2001/DeepWind1.0-890M`](https://huggingface.co/Hexian-2001/DeepWind1.0-890M) |
 
 ## Quick start
 
@@ -47,46 +41,6 @@ from src.models.deepwind import DeepWindModel
 model = DeepWindModel.from_pretrained("Hexian-2001/DeepWind1.0-890M")
 ```
 
-Run zero-shot forecasting with `src/inference/infer.py`, or reproduce the
-evaluation with:
-
-```bash
-python evaluate.py \
-  inference.checkpoint_path=Hexian-2001/DeepWind1.0-890M \
-  run_name=my-evaluation
-```
-
-## Results
-
-Zero-shot results on WindBench (8 datasets × 6 horizons), macro-averaged
-mean. Lower is better for ↓, higher for ↑:
-
-| Metric | DeepWind1.0-890M |
-|---|---|
-| nCRPS ↓ | 0.0961 |
-| nMAE ↓ | 0.1211 |
-| MAE_Coverage | 0.1229 |
-| Accuracy ↑ | 0.8097 |
-| Qualified_Rate ↑ | 0.8001 |
-| R² ↑ | 0.6430 |
-| mean_wQuantileLoss ↓ | 0.2667 |
-
-## Repository layout
-
-```text
-configs/        Hydra model, data, training, and reproduction configurations
-src/            DeepWind model, datasets, training, inference, and evaluation
-scripts/        Local and Pawsey/Setonix launch scripts
-test/           Unit, integration, and data-pipeline checks
-reproduction/   Scripts used to reproduce paper analyses and figures
-tools/          Result collection and operational utilities
-docs/           Data, reproducibility, release, and architecture notes
-model_cards/    Per-checkpoint model cards (also published on the Hub)
-```
-
-Large datasets, checkpoints, logs, and experiment outputs are deliberately not
-stored in Git.
-
 ## Installation
 
 Python 3.10-3.12 is supported. Install PyTorch for your CUDA or ROCm platform
@@ -99,56 +53,85 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-On Pawsey Setonix, use the centre-provided PyTorch ROCm container and the job
-templates under `scripts/setonix/`; see [docs/pawsey.md](docs/pawsey.md).
+## Repository layout
 
-## Data configuration
+```text
+configs/        Hydra model, data, and training configurations
+src/            DeepWind model, datasets, training, inference, and evaluation
+scripts/        Launch scripts (including Pawsey/Setonix job templates)
+test/           Unit and integration tests
+model_cards/    Per-checkpoint model cards (also published on the Hub)
+```
 
-Set portable roots instead of editing Python code:
+Large datasets, checkpoints, logs, and experiment outputs are deliberately not
+stored in Git.
+
+## Data preparation
+
+Set portable roots so the code finds your data without editing source files:
 
 ```bash
 export DEEPWIND_DATA_ROOT=/path/to/deepwind-data
 export DEEPWIND_RUNS_ROOT=/path/to/deepwind-runs
 ```
 
-The expected arrays, metadata schema, preprocessing rules, split isolation,
-and redistribution restrictions are documented in [docs/data.md](docs/data.md).
-The proprietary Shanxi Wind dataset cannot be redistributed.
+The expected array layout and metadata schema are defined in
+`src/data/datasets.py`.
 
-## Training and evaluation
+## Inference
 
-The paper checkpoint was trained for 100,000 steps with a global batch size of
-256. Its recovered resolved configuration is preserved under
-`configs/reproduction/paper_large_actual.yaml`.
+Produce a probabilistic forecast on your own data:
+
+```bash
+python infer.py \
+  model=deepwind_base \
+  inference.checkpoint_path=Hexian-2001/DeepWind1.0-890M \
+  data.npy_path=/path/to/site.npy \
+  data.metadata_path=/path/to/metadata.csv \
+  output.output_path=./forecast.npz
+```
+
+See `configs/infer.yaml` for all options.
+
+## Fine-tuning
+
+Fine-tune the base model on your own data with LoRA:
+
+```bash
+python finetune.py \
+  model=deepwind_base \
+  finetune.pretrained_path=Hexian-2001/DeepWind1.0-890M \
+  run_name=my-finetune
+```
+
+See `configs/finetune.yaml` for the LoRA and data options.
+
+## Pretraining
+
+Pretrain from scratch on your own corpus:
 
 ```bash
 python train.py \
-  model=deepwind_large \
-  training=deepwind_large \
-  run_name=my-run \
-  model.pred_head_type=quantile
-
-python evaluate.py \
-  inference.checkpoint_path=/path/to/checkpoint \
-  run_name=my-evaluation
+  model=deepwind_base \
+  training=deepwind_base \
+  run_name=my-run
 ```
 
-Run a Setonix smoke test before a full job:
+Model variants live under `configs/model/` (`deepwind_small`, `deepwind_base`,
+`deepwind_large`); training schedules live under `configs/training/`.
+
+On Pawsey Setonix, use the centre-provided PyTorch ROCm container and the job
+templates under `scripts/setonix/`.
+
+## Evaluation
+
+Evaluate a checkpoint on your test data:
 
 ```bash
-sbatch scripts/setonix/smoke.sbatch
+python evaluate.py \
+  inference.checkpoint_path=Hexian-2001/DeepWind1.0-890M \
+  run_name=my-evaluation
 ```
-
-## Reproducibility notes
-
-The recovered *large* final checkpoint configuration differs from two
-statements in the published method description: it records
-`use_rotary_emb=false` and `aux_loss_weight=0.01`. The paper describes
-RoPE/xPOS and reports 0.02. The released base model
-(`Hexian-2001/DeepWind1.0-890M`) uses the paper configuration
-(`use_rotary_emb=true`, `aux_loss_weight=0.02`). Both the published
-specification and the actual checkpoint configurations are kept explicitly;
-see [docs/reproducibility.md](docs/reproducibility.md).
 
 ## License and citation
 

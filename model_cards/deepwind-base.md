@@ -68,22 +68,7 @@ post-processing) is provided in the
 
 Trained with AdamW (β₁=0.9, β₂=0.95), peak learning rate `1e-4`, 3% linear
 warmup, cosine decay, weight decay `0.01`, gradient clipping at `1.0`, BF16,
-and a global batch size of 256. This checkpoint corresponds to **10,646
-optimizer steps**.
-
-## Evaluation
-
-Zero-shot results on WindBench (8 datasets × 6 horizons), macro-averaged:
-
-| Metric | Value |
-|---|---|
-| nCRPS ↓ | 0.0961 |
-| nMAE ↓ | 0.1211 |
-| MAE_Coverage | 0.1229 |
-| Accuracy ↑ | 0.8097 |
-| Qualified_Rate ↑ | 0.8001 |
-| R² ↑ | 0.6430 |
-| mean_wQuantileLoss ↓ | 0.2667 |
+and a global batch size of 256.
 
 ## Limitations
 

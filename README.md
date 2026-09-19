@@ -379,21 +379,30 @@ adaptive windowing, and the Phase-1 sim-to-real augmentation).
 
 ### What full reproduction costs
 
-From the paper (16× AMD Instinct MI250X, 64 GB each, BF16, global batch 256,
-100k steps):
+Measured from the real training runs (16× AMD Instinct MI250X — 2 nodes × 8
+GPUs — BF16, global batch 256, 100k steps). Wall time is the *actual* wall-clock
+rate including periodic eval and checkpoint writes, so it is slower than the
+paper's short-benchmark extrapolation.
 
-| Variant | Params | Wall time | GPU-hours | Peak VRAM (BS=1) | Throughput (BS=16) |
-|---|---|---|---|---|---|
-| Small | ~33 M | 13.3 h | 213 | 0.28 GB | 148 samples/s |
-| Base | ~890 M | 56.5 h | 903 | 2.04 GB | 25.8 samples/s |
-| Large | ~1.3 B | 82.7 h | 1323 | 5.65 GB | 10.7 samples/s |
+| Variant | Params | Measured rate | Wall time (100k steps) | GPU-hours |
+|---|---|---|---|---|
+| Small | ~33 M | ~1.7 steps/s | ~16 h | ~260 |
+| Base | ~890 M | ~0.2 steps/s | ~134 h | ~2,140 |
+| Large | ~1.3 B | ~0.34 steps/s | ~83 h | ~1,320 |
 
-So a Small reproduction is a single overnight run on a 16-GPU node; Base is ~2.5
-days; Large is ~3.5 days. On fewer GPUs the wall time scales up roughly linearly
-(the effective batch size must stay at 256 via gradient accumulation). The
-corpus itself — 560 billion observations across 20 sources — is the expensive
-part to assemble; the Shanxi Wind SCADA source is proprietary and not
-redistributed, which is why only WIND Toolkit is shipped for re-training.
+> Sources: **Small** — today's `deepwind-small-loss-powonly` run
+> (checkpoint→checkpoint on 16 MI250X). **Base** — the Sep-18
+> `deepwind-base-paper-seed42` run (real wall-clock, before the
+> `ddp_find_unused_parameters=false` fix, so expect it to improve on re-run).
+> **Large** — the Feb-2026 `deepwind_large_v5` benchmark; re-measure when Large is
+> re-trained. GPU-hours = wall time × 16.
+
+So a Small reproduction is a single overnight run on a 16-GPU node; Base and
+Large are multi-day jobs. On fewer GPUs the wall time scales up roughly linearly
+(keep the effective batch at 256 via gradient accumulation). The corpus itself —
+560 billion observations across 20 sources — is the expensive part to assemble;
+the Shanxi Wind SCADA source is proprietary and not redistributed, which is why
+only WIND Toolkit is shipped for re-training.
 
 On Pawsey Setonix, the job templates under `scripts/setonix/` are
 account-portable — they resolve run/data/venv/project roots from `$MYSCRATCH`

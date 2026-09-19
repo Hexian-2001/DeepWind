@@ -17,7 +17,6 @@
 #
 # Writes per-(dataset,horizon) metric JSONs under
 #   ${DEEPWIND_RUNS_ROOT}/results/deepwind/${EVAL_NAME}/
-# then aggregate with:  python tools/aggregate_eval.py <that dir>
 # ---------------------------------------------------------------------------
 
 set -euo pipefail
